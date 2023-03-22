@@ -1,7 +1,10 @@
+## **AUTO EDA**
+- Python library with code example to perform EDA and data cleaning. 
 
-
-
-Python Code: 
+### **The library includes the following functions:**
+- **load_dataset(file_path):** loads the dataset from the specified file path and returns a pandas DataFrame.
+- **explore_dataset(data):** provides summary statistics and visualizations of the dataset, including the number of rows and columns, data types, missing values, and distribution of values for each column.
+- **clean_dataset(data, drop_missing=True):** performs data cleaning on the dataset, including removing duplicate rows, filling missing values, and dropping columns with a high percentage of missing values. The user can choose whether to drop rows with missing values or not. 
 
 ```python 
 
@@ -56,9 +59,7 @@ def clean_dataset(data, drop_missing=True):
     return data
 ``` 
 
-
-
-Using your Library: 
+How to use:
 
 ```python
 # Load the dataset
