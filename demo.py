@@ -3,7 +3,7 @@ import pyforest
 from main import load_dataset, explore_dataset, clean_dataset  
 
 
-data = load_dataset("Iris.csv") 
+data = load_dataset("data/Iris.csv") 
 
 print(data.head(2)) 
 

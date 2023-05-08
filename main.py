@@ -1,12 +1,11 @@
-import pandas as pd
+#Import the required packages. 
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-# Auto importing all the packages using pyforest 
-# import pyforest 
-
+#Method to read the dataset 
 def load_dataset(file_path):
     """Loads the dataset from the specified file path and returns a pandas DataFrame."""
     if file_path.endswith('.csv'):
@@ -18,10 +17,17 @@ def load_dataset(file_path):
     elif file_path.endswith('.xlsx'):
         return pd.read_excel(file_path)
 
+
+#Method to Explore  the dataset
 def explore_dataset(data):
     """Provides summary statistics and visualizations of the dataset."""
+    #Dataset Shape
     print("Dataset shape:", data.shape)
+
+    #Check the dataset  columns datatype
     print("Dataset data types:\n", data.dtypes)
+
+    #Check for the missing values
     print("Number of missing values:\n", data.isna().sum())
 
     # Visualize the distribution of values for each column
@@ -35,6 +41,8 @@ def explore_dataset(data):
             plt.title(col)
             plt.show()
 
+
+#method to clean the dataset 
 def clean_dataset(data, drop_missing=True):
     """Performs data cleaning on the dataset."""
     # Remove duplicate rows
@@ -52,7 +60,7 @@ def clean_dataset(data, drop_missing=True):
     if drop_missing:
         data.dropna(inplace=True)
         
-    return data
+    return data 
 
 
 #Signal that the code is working without errors.(The following code should be commented out) 
