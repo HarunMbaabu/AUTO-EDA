@@ -1,5 +1,8 @@
 ## **AUTO EDA**
-- Python library with code example to perform EDA and data cleaning. 
+- Automated exploratory data analysis (EDA) Library which incorporates GPT-3.5 to explain the output to users. 
+
+
+
 
 ### **The library includes the following functions:**
 - **load_dataset(file_path):** loads the dataset from the specified file path and returns a pandas DataFrame.
