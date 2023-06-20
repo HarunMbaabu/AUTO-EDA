@@ -9,26 +9,45 @@
 - **explore_dataset(data):** provides summary statistics and visualizations of the dataset, including the number of rows and columns, data types, missing values, and distribution of values for each column.
 - **clean_dataset(data, drop_missing=True):** performs data cleaning on the dataset, including removing duplicate rows, filling missing values, and dropping columns with a high percentage of missing values. The user can choose whether to drop rows with missing values or not. 
 
+
 ```python 
 
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
+#Import the required packages. 
+import pandas as pd, seaborn as sns, matplotlib.pyplot as plt
+from dotenv import dotenv_values
+import openai 
 
+
+#Load environmentvaribles from .env file  
+env_vars = dotenv_values('.env')
+
+
+openai.api_key  = env_vars['API_KEY']
+
+
+#Method to read the dataset 
 def load_dataset(file_path):
     """Loads the dataset from the specified file path and returns a pandas DataFrame."""
     if file_path.endswith('.csv'):
         return pd.read_csv(file_path)
     elif file_path.endswith('.json'):
         return pd.read_json(file_path)
+    elif file_path.endswith('.json'):
+        return pd.read_parquet(file_path)
     elif file_path.endswith('.xlsx'):
         return pd.read_excel(file_path)
 
+
+#Method to Explore  the dataset
 def explore_dataset(data):
     """Provides summary statistics and visualizations of the dataset."""
+    #Dataset Shape
     print("Dataset shape:", data.shape)
+
+    #Check the dataset  columns datatype
     print("Dataset data types:\n", data.dtypes)
+
+    #Check for the missing values
     print("Number of missing values:\n", data.isna().sum())
 
     # Visualize the distribution of values for each column
@@ -42,6 +61,8 @@ def explore_dataset(data):
             plt.title(col)
             plt.show()
 
+
+#method to clean the dataset 
 def clean_dataset(data, drop_missing=True):
     """Performs data cleaning on the dataset."""
     # Remove duplicate rows
@@ -59,7 +80,12 @@ def clean_dataset(data, drop_missing=True):
     if drop_missing:
         data.dropna(inplace=True)
         
-    return data
+    return data 
+
+
+#Signal that the code is working without errors.(The following code should be commented out) 
+print('The package is working without errors.')
+
 ``` 
 
 How to use:
