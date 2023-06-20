@@ -1,8 +1,14 @@
 #Import the required packages. 
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
+import pandas as pd, seaborn as sns, matplotlib.pyplot as plt
+from dotenv import dotenv_values
+import openai 
+
+
+#Load environmentvaribles from .env file  
+env_vars = dotenv_values('.env')
+
+
+openai.api_key  = env_vars['API_KEY']
 
 
 #Method to read the dataset 
