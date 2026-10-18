@@ -147,12 +147,37 @@ otherwise those fields stay empty.
 Re-running with the same file does nothing; `--force` re-imports without creating duplicates.
 Projects that disappear from a newer workbook are flagged, not deleted.
 
+## Product catalog
+
+The verified catalog is a spreadsheet with a `Catalog` sheet, one row per product or package:
+
+| Column | Meaning |
+|--------|---------|
+| `category` | A category key (`/categories`), e.g. `audio`, `cinema_addons`, `smart_home` |
+| `sku` | Your unique product code |
+| `name`, `brand`, `supplier`, `description` | Shown to the sales team; `supplier` e.g. Intelligent Home or Prime Audio Solutions |
+| `price_kes`, `price_unit` | `300000`, `300,000`, `300K` or `1.5M`; blank = "to be scoped". Put `from` in the unit (e.g. `package (from)`) for starting prices |
+| `install_stage` | `pre-wiring` or `first fix` (before plastering ends), `finishing` (until painting), `any time` |
+| `retrofit_ok` | `yes` if it can still be added after its install stage |
+| `available`, `price_checked`, `notes` | Optional |
+
+Send the file to the bot in Telegram (as with the workbook). The whole file is checked first:
+one bad row rejects it with a list of what to fix, so a half-loaded catalog never goes live.
+Loading replaces the previous catalog; products left out are hidden, not deleted. Categories
+with products are marked as having a verified catalog.
+
+`/analyze` then lists **catalog options that fit the project's recorded stage** (normal
+installs first, then retrofit options, cheapest first) and the AI may mention only those, by
+their catalog name and price. In chat, `find_products` answers questions such as "what audio
+products would suit #205?" or "what's our cheapest smart home option?". Catalog data contains
+no customer information.
+
 ## Chat mode
 
 Any message that is not a command is answered from the project database. The AI provider
 (Mistral or DeepSeek; Claude is not used for chat) never queries the database itself: it calls
-five tools that the bot runs locally (`find_projects`, `count_projects`, `get_project`,
-`analyze_opportunity`, `list_categories`) and writes the answer from what they return.
+six tools that the bot runs locally (`find_projects`, `count_projects`, `get_project`,
+`analyze_opportunity`, `find_products`, `list_categories`) and writes the answer from what they return.
 
 - **What leaves the bot:** your question, the last three questions and answers (for follow-ups,
   kept for 30 minutes or until `/newchat`), and tool results: project, area, city and people's

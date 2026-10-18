@@ -97,4 +97,4 @@ async def test_upload_reports_unreadable_workbook(factory, tmp_path, context):
     context.bot_data["db"] = factory
     update, status = _upload(ALLOWED_ID, source=bad)
     await import_handlers.workbook_upload(update, context)
-    assert status.texts[-1].startswith("I couldn't import that workbook")
+    assert status.texts[-1].startswith("I couldn't import that file")

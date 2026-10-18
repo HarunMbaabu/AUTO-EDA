@@ -20,9 +20,10 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from brains_bot.database.models import Contact, Project, ProjectContact
+from brains_bot.database.models import CatalogProduct, Contact, Project, ProjectContact
 from brains_bot.logging_setup import redact
 from brains_bot.services import analysis as an
+from brains_bot.services import catalog
 from brains_bot.services import project_service as svc
 from brains_bot.services.categories import active_categories, resolve_category
 from brains_bot.services.chat_api import ChatAnalyzer
@@ -75,7 +76,9 @@ the date a stage was recorded and say when it may be out of date.
 Write plain text for Telegram: short sentences or simple "- " lists, no Markdown, no tables. \
 Refer to projects as "#<number> <name>" so the user can open one with /project <number>. \
 Phone numbers are never available to you; for contact details tell the user to use \
-/project <number>. Do not suggest specific products or prices.\
+/project <number>. Mention products and prices only from find_products or analyze_opportunity \
+results, with their exact names and prices, and end with a short line such as "Confirm \
+prices before quoting." Never invent products, brands, specifications or prices.\
 """
 
 _FILTERS = {
@@ -156,6 +159,26 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "find_products",
+            "description": "Products and packages from the verified catalog, cheapest first. "
+            "With project_id, only those that still fit that project's recorded stage.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "description": "Category key, e.g. audio"},
+                    "text": {
+                        "type": "string",
+                        "description": "Words in name, brand or description",
+                    },
+                    "project_id": {"type": "integer"},
+                    "max_price_kes": {"type": "number"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "list_categories",
             "description": "The product categories that can be analysed, with their keys.",
             "parameters": {"type": "object", "properties": {}},
@@ -208,6 +231,7 @@ class ProjectTools:
             "get_project": self.get_project,
             "analyze_opportunity": self.analyze_opportunity,
             "list_categories": self.list_categories,
+            "find_products": self.find_products,
         }
         if name not in handlers:
             return {"error": f"unknown tool {name}"}
@@ -318,6 +342,53 @@ class ProjectTools:
             "contact_details": f"phone numbers are not shared here; use /project {project.id}",
         }
 
+    def find_products(
+        self,
+        category: str | None = None,
+        text: str | None = None,
+        project_id: int | None = None,
+        max_price_kes: float | None = None,
+    ) -> dict[str, Any]:
+        if not self.session.scalar(select(CatalogProduct.id).where(CatalogProduct.active).limit(1)):
+            return {"error": "no product catalog has been loaded yet"}
+        query = select(CatalogProduct).where(CatalogProduct.active)
+        if category:
+            found = resolve_category(self.session, str(category))
+            if found is None:
+                return {"error": f"unknown category '{category}'; call list_categories"}
+            query = query.where(CatalogProduct.category_key == found.key)
+        if words := (text or "").strip():
+            pattern = svc.like_pattern(words)
+            query = query.where(
+                or_(
+                    CatalogProduct.name.ilike(pattern, escape="\\"),
+                    CatalogProduct.brand.ilike(pattern, escape="\\"),
+                    CatalogProduct.description.ilike(pattern, escape="\\"),
+                )
+            )
+        if max_price_kes is not None:
+            query = query.where(CatalogProduct.price_kes <= max_price_kes)
+        products = list(
+            self.session.scalars(
+                query.order_by(CatalogProduct.price_kes.asc().nulls_last(), CatalogProduct.id)
+            )
+        )
+        stage = None
+        result: dict[str, Any] = {}
+        if project_id is not None:
+            project = self.session.get(Project, int(project_id))
+            if project is None:
+                return {"error": f"no project #{project_id}"}
+            found_stage = detect_stage([(n.observed_date, n.text) for n in project.notes])
+            stage = found_stage.stage
+            products = [p for p in products if catalog.fits_stage(p, stage)]
+            self.projects_seen.add(project.id)
+            result["project_stage"] = found_stage.label
+            result["stage_recorded_on"] = _iso(found_stage.recorded_on)
+        result["products"] = [catalog.product_summary(p, stage) for p in products[:MAX_RESULTS]]
+        result["total"] = len(products)
+        return result
+
     def list_categories(self) -> dict[str, Any]:
         return {
             "categories": [{"key": c.key, "name": c.name} for c in active_categories(self.session)]
@@ -363,6 +434,7 @@ class ProjectTools:
             "possible_needs": [n.need for n in result.possible_needs],
             "unknowns": result.unknowns,
             "suggested_next_step": result.suggested_next_step,
+            "catalog_options": ctx.payload.get("catalog_options", []),
             "full_report": f"/analyze {project.id} {found.key}",
         }
 
