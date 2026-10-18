@@ -51,7 +51,7 @@ class Provider:
 PROVIDERS = {
     "mistral": Provider(
         "mistral", "Mistral", "MISTRAL_API_KEY", "MISTRAL_MODEL", "MISTRAL_BASE_URL",
-        "mistral-large-latest", "https://api.mistral.ai/v1",
+        "ministral-14b-latest", "https://api.mistral.ai/v1",
     ),
     "deepseek": Provider(
         "deepseek", "DeepSeek", "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "DEEPSEEK_BASE_URL",

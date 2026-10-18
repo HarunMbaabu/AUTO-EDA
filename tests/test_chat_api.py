@@ -95,7 +95,7 @@ def test_mistral_uses_its_own_url_and_default_model():
     result, _ = analyzer(client, "mistral").analyze(ctx())
     assert result.fit == "possible"
     assert str(seen[0].url) == "https://api.mistral.ai/v1/chat/completions"
-    assert body_model(seen[0]) == "mistral-large-latest"
+    assert body_model(seen[0]) == "ministral-14b-latest"
     with pytest.raises(AnalysisError, match="Mistral API key was rejected"):
         analyzer(server((401, {})), "mistral").analyze(ctx())
 
