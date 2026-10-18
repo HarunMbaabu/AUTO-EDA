@@ -15,6 +15,17 @@ PROJECT_SHEETS = ("Data Base", "Active Sheet", "To share with Dealer")
 DEALER_SHEETS = ("Philmax data", "Sheet3")
 SUMMARY_SHEETS = ("Sheet1", "Hit Rate", "Pivot (2)")
 
+# Different exports of the workbook name the same columns differently. Headers are mapped to
+# one canonical name at read time; the original header is kept for provenance.
+HEADER_ALIASES = {
+    "Sr No.": "ID",
+    "Sr No": "ID",
+    "Sr. No.": "ID",
+    "Name of Area": "Name of Area (Location) of Site",
+    "Phone Number (WhatsApp)": "Contact Details",
+    "Phone Number": "Contact Details",
+}
+
 # A row with none of these filled (and no ID) continues the record above it: in "Data Base"
 # one visit can span several rows, with the extra rows holding follow-up comments only.
 KEY_COLUMNS = ("Name of Potential Site", "Name of Salesperson", "Date of Site Visit")
@@ -28,6 +39,7 @@ class SourceRow:
     values: dict[str, Any]
     extra: list[tuple[str, Any]] = field(default_factory=list)  # (column, value) from later rows
     issues: list[str] = field(default_factory=list)
+    original_headers: dict[str, str] = field(default_factory=dict)  # canonical -> as in sheet
 
     @property
     def source_id(self) -> int | None:
@@ -49,9 +61,12 @@ class SourceRow:
                 return v.isoformat()
             return v
 
-        data = {k: safe(v) for k, v in self.values.items() if v is not None}
+        def name(k: str) -> str:
+            return self.original_headers.get(k, k)
+
+        data = {name(k): safe(v) for k, v in self.values.items() if v is not None}
         if self.extra:
-            data["_continuation"] = [[k, safe(v)] for k, v in self.extra]
+            data["_continuation"] = [[name(k), safe(v)] for k, v in self.extra]
         return data
 
 
@@ -61,10 +76,15 @@ def _header_name(value: Any) -> str | None:
     return re.sub(r"\s+", " ", str(value)).strip() or None
 
 
+def canonical_header(value: Any) -> str | None:
+    name = _header_name(value)
+    return HEADER_ALIASES.get(name, name) if name else None
+
+
 def find_header_row(ws: Worksheet, max_scan: int = 10) -> int:
     for row in range(1, min(ws.max_row, max_scan) + 1):
-        names = [_header_name(c.value) for c in ws[row]]
-        if names and names[0] in ("ID", "Sr. No.") and sum(1 for n in names if n) >= 3:
+        names = [canonical_header(c.value) for c in ws[row]]
+        if names and names[0] == "ID" and sum(1 for n in names if n) >= 3:
             return row
     raise ValueError(f"no header row found in sheet {ws.title!r}")
 
@@ -73,9 +93,12 @@ def _is_blank(value: Any) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
 
 
-def read_sheet(ws: Worksheet) -> list[SourceRow]:
+def read_sheet(ws: Worksheet) -> tuple[list[SourceRow], dict[str, str]]:
+    """Return the sheet's records and its header mapping (canonical -> original)."""
     header_row = find_header_row(ws)
-    headers = [_header_name(c.value) for c in ws[header_row]]
+    originals = [_header_name(c.value) for c in ws[header_row]]
+    headers = [canonical_header(c.value) for c in ws[header_row]]
+    mapping = {h: o for h, o in zip(headers, originals, strict=True) if h and o}
     records: list[SourceRow] = []
     for row_idx, row in enumerate(
         ws.iter_rows(min_row=header_row + 1, values_only=True), start=header_row + 1
@@ -90,11 +113,17 @@ def read_sheet(ws: Worksheet) -> list[SourceRow]:
             parent.extra.extend((k, v) for k, v in values.items() if not _is_blank(v))
             parent.last_row = row_idx
             continue
-        record = SourceRow(sheet=ws.title, first_row=row_idx, last_row=row_idx, values=values)
+        record = SourceRow(
+            sheet=ws.title,
+            first_row=row_idx,
+            last_row=row_idx,
+            values=values,
+            original_headers=mapping,
+        )
         if record.source_id is None and is_project_sheet:
             record.issues.append("missing source ID")
         records.append(record)
-    return records
+    return records, mapping
 
 
 @dataclass
@@ -102,15 +131,17 @@ class Workbook:
     sheets: dict[str, list[SourceRow]]
     skipped_sheets: list[str]
     unknown_sheets: list[str]
+    headers: dict[str, dict[str, str]] = field(default_factory=dict)  # sheet -> canonical->orig
 
 
 def read_workbook(path: Path) -> Workbook:
     wb = load_workbook(path, data_only=True, read_only=False)
     sheets: dict[str, list[SourceRow]] = {}
+    headers: dict[str, dict[str, str]] = {}
     skipped, unknown = [], []
     for ws in wb.worksheets:
         if ws.title in PROJECT_SHEETS or ws.title in DEALER_SHEETS:
-            sheets[ws.title] = read_sheet(ws)
+            sheets[ws.title], headers[ws.title] = read_sheet(ws)
         elif ws.title in SUMMARY_SHEETS:
             skipped.append(ws.title)
         else:
@@ -118,4 +149,4 @@ def read_workbook(path: Path) -> Workbook:
     missing = [s for s in PROJECT_SHEETS[:1] if s not in sheets]
     if missing:
         raise ValueError(f"workbook is missing required sheet(s): {missing}")
-    return Workbook(sheets=sheets, skipped_sheets=skipped, unknown_sheets=unknown)
+    return Workbook(sheets=sheets, skipped_sheets=skipped, unknown_sheets=unknown, headers=headers)

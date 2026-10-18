@@ -72,8 +72,13 @@ uv run brains-bot-import "data/raw/Physical Projects Mapping Data 6th March.xlsx
 
 The import:
 
-- reads `Data Base`, `Active Sheet` and `To share with Dealer`, finding the header row in each
-  sheet, and folds follow-up comment rows (merged cells) into their visit;
+- reads `Data Base` (and `Active Sheet` / `To share with Dealer` when present), finding the
+  header row in each sheet, and folds follow-up comment rows (merged cells) into their visit;
+- accepts both the full export and the slimmed-down one (`Sr No.`, `Name of Area`,
+  `Phone Number (WhatsApp)`, `Audio Status`). Column names are mapped on read, the original
+  names are kept for provenance, and the report lists renamed, missing and empty columns.
+  In the current file `Audio Status` holds the same site/paint progress notes as the old
+  `Comments` column, so it is imported as notes, never as evidence of interest in audio;
 - treats `Data Base` as primary and links the other sheets by ID **only when the content
   agrees** (same phone, or similar site name). IDs in Active Sheet were shifted by inserted
   rows, so ID-only matching would merge different sites. Uncertain records are kept separate
