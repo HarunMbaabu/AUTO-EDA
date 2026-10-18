@@ -71,6 +71,38 @@ uv run brains-bot            # or: uv run python -m brains_bot
 
 The bot uses long polling, so no public URL is needed. Stop it with Ctrl+C; it shuts down cleanly.
 
+## Deploy on Render (always on)
+
+`render.yaml` is a Render Blueprint: a background worker (Starter plan) built from the
+`Dockerfile`, plus a PostgreSQL database (Basic 256 MB plan). Each deploy runs
+`alembic upgrade head` first; categories are synced when the bot starts.
+
+1. In Render: **New > Blueprint**, connect the GitHub repository that holds this project.
+   Render reads `render.yaml` from the repository root, so this works when `brains-bot/` is the
+   root (e.g. `vluti/brains-bot`). For a repository where the project sits in `brains-bot/`
+   (AUTO-EDA), create the database and a **Background Worker** by hand instead, with
+   **Root Directory** `brains-bot`, **Runtime** Docker, **Pre-Deploy Command**
+   `alembic upgrade head` and the environment variables listed in `render.yaml`
+   (`DATABASE_URL` = the database's Internal Database URL).
+2. Enter the secrets Render asks for: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USER_IDS`,
+   `MISTRAL_API_KEY`.
+3. Stop every other copy of the bot first (dev machine, cloud session). Telegram allows one
+   long-polling connection per token; two copies make both fail with "Conflict" errors.
+4. Import the workbook once (the worker has no disk for private files). In the database's
+   **Access Control**, allow your own IP address, copy the **External Database URL**, then on
+   a machine with this project and the workbook:
+
+   ```bash
+   DATABASE_URL="<external database url>" uv run alembic upgrade head
+   DATABASE_URL="<external database url>" uv run brains-bot-import "data/raw/<workbook>.xlsx"
+   ```
+
+   Remove your IP from Access Control afterwards. Re-run the import the same way when a newer
+   workbook arrives.
+
+Logs are in the worker's **Logs** tab. Pushing to the connected branch redeploys
+automatically.
+
 ## Database and workbook import
 
 Requires PostgreSQL 14+. Create a database and user, set `DATABASE_URL` in `.env`, then:
