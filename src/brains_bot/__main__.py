@@ -35,6 +35,11 @@ def main() -> int:
             extra={"event": "empty_allowlist"},
         )
 
+    if not (settings.anthropic_key_present and settings.claude_model):
+        log.warning(
+            "Claude analysis disabled: set ANTHROPIC_API_KEY and CLAUDE_MODEL to enable /analyze",
+            extra={"event": "analysis_disabled"},
+        )
     application = build_application(settings)
     log.info(
         "bot starting (long polling)",

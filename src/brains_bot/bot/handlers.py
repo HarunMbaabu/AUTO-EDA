@@ -8,6 +8,7 @@ import time
 from collections.abc import Awaitable, Callable
 
 from telegram import Update
+from telegram.error import NetworkError
 from telegram.ext import ContextTypes
 
 from brains_bot.config import Settings
@@ -26,6 +27,8 @@ PRIVATE_COMMANDS = {
     "projects": "Browse projects, most recent visit first",
     "search": "Search by site, area, city or a person/company name",
     "project": "Show one project, e.g. /project 12",
+    "categories": "Product categories and their best timing",
+    "analyze": "Claude analysis for a project and category, e.g. /analyze 12 audio",
 }
 
 NOT_AUTHORIZED = (
@@ -140,6 +143,14 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if isinstance(context.error, NetworkError) and not isinstance(update, Update):
+        # A dropped connection while polling Telegram; the library retries on its own.
+        log.warning(
+            "temporary network problem talking to Telegram; retrying (%s)",
+            type(context.error).__name__,
+            extra={"event": "network_retry"},
+        )
+        return
     # Log the exception type and traceback only, never the update payload.
     log.error(
         "unhandled error while processing update",

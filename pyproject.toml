@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",
+    "anthropic>=1.15.0",
     "openpyxl>=3.1.5",
     "psycopg[binary]>=3.2",
     "python-dotenv>=1.2.4",
@@ -13,15 +14,11 @@ dependencies = [
     "sqlalchemy>=2.0",
 ]
 
-[project.optional-dependencies]
-anthropic = [
-    "anthropic>=1.15.0",
-]
-
 [project.scripts]
 brains-bot = "brains_bot.__main__:main"
 brains-bot-check-anthropic = "brains_bot.services.anthropic_check:main"
 brains-bot-import = "brains_bot.importers.cli:main"
+brains-bot-categories = "brains_bot.services.categories_cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]

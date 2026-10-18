@@ -111,3 +111,81 @@ def project_detail(d: ProjectDetail) -> str:
     out += ["", "Source"]
     out += [f"- {src}" for src in d.sources]
     return truncate("\n".join(out), MAX_MESSAGE)
+
+
+def category_list(categories) -> str:
+    from brains_bot.services.stages import STAGES
+
+    if not categories:
+        return "No categories are set up yet. Run: uv run brains-bot-categories"
+    lines = ["Categories", ""]
+    for c in categories:
+        catalog = "verified catalog" if c.has_verified_catalog else "no catalog yet"
+        lines.append(f"{c.key}: {c.name}")
+        lines.append(f"    Best time: {STAGES[c.best_from]} to {STAGES[c.best_to]} · {catalog}")
+    lines += ["", "Use: /analyze <project number> <category>, e.g. /analyze 205 audio"]
+    return truncate("\n".join(lines), MAX_MESSAGE)
+
+
+FIT_LABELS = {
+    "strong": "Strong",
+    "possible": "Possible",
+    "weak": "Weak",
+    "insufficient_evidence": "Not enough evidence",
+}
+TIMING_LABELS = {
+    "unknown": "Unknown",
+    "early": "Early",
+    "in_window": "Good time",
+    "retrofit_only": "Late: retrofit only",
+    "too_late": "Too late",
+}
+
+
+def _age(days: int | None) -> str:
+    if days is None:
+        return ""
+    if days < 60:
+        return f", {days} days ago"
+    return f", about {round(days / 30)} months ago"
+
+
+def analysis(ctx, result, note: str) -> str:
+    stage, timing, category = ctx.stage, ctx.timing, ctx.category
+    out = [
+        f"Analysis: Project #{ctx.project_id} · {category.name}",
+        f"Fit: {FIT_LABELS.get(result.fit, result.fit)}",
+        result.summary,
+        "",
+        f"Timing: {TIMING_LABELS.get(timing.status, timing.status)}",
+    ]
+    if stage.stage:
+        out.append(
+            f"Last recorded stage: {stage.label} "
+            f"(note from {fmt_date(stage.recorded_on)}{_age(timing.age_days)})"
+        )
+        out.append(f'    "{truncate(stage.evidence or "", 200)}"')
+    else:
+        out.append("Last recorded stage: not recorded in the notes")
+    out.append(timing.explanation)
+    if timing.stale:
+        out.append("⚠ This stage was recorded a while ago. Confirm the current stage first.")
+    if result.timing_comment:
+        out.append(result.timing_comment)
+
+    if result.recorded_facts:
+        out += ["", "Recorded facts"]
+        out += [f"- {f.fact} ({f.source})" for f in result.recorded_facts]
+    if result.possible_needs:
+        out += ["", "Possible needs (inferred, not confirmed)"]
+        out += [f"- {p.need} [{p.confidence}]: {p.reasoning}" for p in result.possible_needs]
+    if result.unknowns:
+        out += ["", "Unknowns"]
+        out += [f"- {u}" for u in result.unknowns]
+    out += ["", "Suggested next step", result.suggested_next_step]
+    catalog = (
+        "" if category.has_verified_catalog
+        else " No products or prices are suggested until a verified catalog is loaded."
+    )  # fmt: skip
+    out += ["", f"Based on the imported workbook, not verified current status.{catalog}", note]
+    return truncate("\n".join(out), MAX_MESSAGE)

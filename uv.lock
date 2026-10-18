@@ -67,16 +67,12 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "anthropic" },
     { name = "openpyxl" },
     { name = "psycopg", extra = ["binary"] },
     { name = "python-dotenv" },
     { name = "python-telegram-bot" },
     { name = "sqlalchemy" },
-]
-
-[package.optional-dependencies]
-anthropic = [
-    { name = "anthropic" },
 ]
 
 [package.dev-dependencies]
@@ -89,14 +85,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.20.0" },
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=1.15.0" },
+    { name = "anthropic", specifier = ">=1.15.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "python-telegram-bot", specifier = ">=21" },
     { name = "sqlalchemy", specifier = ">=2.0" },
 ]
-provides-extras = ["anthropic"]
 
 [package.metadata.requires-dev]
 dev = [

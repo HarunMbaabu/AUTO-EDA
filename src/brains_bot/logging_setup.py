@@ -20,7 +20,10 @@ _PATTERNS = [
 ]
 
 # Fields a caller may attach with `extra=` that are copied into the JSON output.
-_EXTRA_FIELDS = ("event", "user_id", "command", "authorized", "allowlist_size")
+_EXTRA_FIELDS = (
+    "event", "user_id", "command", "authorized", "allowlist_size",
+    "model", "stop_reason", "input_tokens", "output_tokens", "request_id",
+)  # fmt: skip
 
 
 def redact(text: str, secrets: Iterable[str] = ()) -> str:

@@ -4,8 +4,7 @@ A human-in-the-loop sales intelligence assistant for authorized sales operators,
 private Telegram bot. It never sends messages to customers on its own: it prepares, a human
 reviews and sends.
 
-**Current status: Phase 2 (workbook import and project lookup).** Claude analysis (Phase 3) is
-not built yet.
+**Current status: Phase 3 (Claude analysis).** Product catalogs (Phase 4) are not built yet.
 
 ## Commands
 
@@ -18,6 +17,8 @@ not built yet.
 | `/projects [page]` | Authorized     | Lists projects, most recent visit first, with Previous/Next buttons |
 | `/search <text>`   | Authorized     | Searches site names, areas, cities, addresses and names of people/companies (not phone numbers) |
 | `/project <number>`| Authorized     | One project: location, audio status, people, latest notes, review flags and source rows |
+| `/categories`      | Authorized     | Product categories and the construction stages when each is best pitched |
+| `/analyze <number> <category> [refresh]` | Authorized | Claude assessment: fit, timing, recorded facts, inferred needs, unknowns, next step |
 
 Contact phone numbers are shown masked (`+254 7XX XXX 678`) together with the marketing consent
 status, which the import always sets to **unknown**. Estimated paint start dates are labelled as
@@ -104,22 +105,48 @@ otherwise those fields stay empty.
 Re-running with the same file does nothing; `--force` re-imports without creating duplicates.
 Projects that disappear from a newer workbook are flagged, not deleted.
 
-## Optional: check the Claude API connection
+## Claude analysis (`/analyze`)
 
-Not used by the bot yet. Set `ANTHROPIC_API_KEY` and `CLAUDE_MODEL` in `.env`, then:
+Set `ANTHROPIC_API_KEY` and `CLAUDE_MODEL` (e.g. `claude-opus-5-5`) in `.env` or the
+environment. Without them the bot runs normally and `/analyze` says it is not configured.
+Check the connection with:
 
 ```bash
-uv sync --extra anthropic
 uv run brains-bot-check-anthropic
 ```
 
-It sends one tiny request and prints `OK` or a specific failure (bad key, unknown model,
-network error).
+How an analysis works:
+
+1. **Categories** come from `src/brains_bot/data/categories.json` (audio plus the cross-sell
+   categories: painting & finishes, smart home, cinema add-ons, joinery, outdoor living,
+   networking, flooring, interior design). Each has a best-time window in construction stages.
+   The bot syncs them at start-up, or run `uv run brains-bot-categories`. Add a category by
+   editing the file; no code change.
+2. **Stage and timing are computed by the backend**, not by Claude: the most advanced
+   construction stage mentioned in the site notes (with the sentence it came from and the
+   note date) against the category's window. Stages older than 120 days are flagged as
+   possibly out of date.
+3. **Claude receives the minimum**: project number, area, city, dates, stage, timing and the
+   site notes with phone numbers, emails, titled names (`Mr. X`) and the project's recorded
+   owner/contact/architect names replaced. Site names, contact names and phone numbers are
+   never sent. Notes are passed as quoted data and the instructions say to ignore any
+   instructions inside them.
+4. **The answer has a fixed structure** (validated; one retry if it is malformed): fit,
+   summary, recorded facts with their source, possible needs marked as inferred with a
+   confidence, unknowns, a timing comment and a suggested next step. Claude is told never to
+   invent budgets, preferences, products or prices; no product is named until a verified
+   catalog exists (Phase 4).
+5. **Results are saved** in `opportunity_assessments` with the model and token counts, and
+   re-used for 14 days for the same project, category and data import (add `refresh` to run
+   again). Calls are logged with model, token counts and request ID only, never the prompt.
+   Safety refusals, timeouts, rate limits and bad keys come back as plain messages; on
+   supported models, refused requests are retried server-side on Anthropic's recommended
+   fallback model.
 
 ## Development
 
 ```bash
-uv sync --all-extras         # includes the optional anthropic package
+uv sync
 uv run pytest                # tests
 uv run ruff check .          # lint
 uv run ruff format .         # format
@@ -146,10 +173,13 @@ src/brains_bot/
 │   ├── app.py               # builds the Telegram application, registers handlers
 │   ├── handlers.py          # core commands and the access check
 │   ├── project_handlers.py  # /projects, /search, /project
+│   ├── analysis_handlers.py # /categories, /analyze
 │   └── formatting.py        # plain-text message layout
 ├── database/
 │   ├── models.py            # SQLAlchemy schema
 │   └── session.py           # engine and sessions
+├── data/
+│   └── categories.json      # product categories and their timing windows
 ├── importers/
 │   ├── workbook.py          # reads sheets, finds headers, folds continuation rows
 │   ├── normalize.py         # phones, dates, names, amounts
@@ -159,7 +189,10 @@ src/brains_bot/
 │   └── cli.py               # brains-bot-import command
 └── services/
     ├── project_service.py   # project queries and audit log
-    └── anthropic_check.py   # optional Claude connectivity check
+    ├── stages.py            # construction stage detection and category timing
+    ├── categories.py        # category sync and lookup
+    ├── analysis.py          # Claude context, prompt, structured output, saving
+    └── anthropic_check.py   # Claude connectivity check
 migrations/                  # Alembic migrations
 tests/
 ```
@@ -167,8 +200,9 @@ tests/
 ## Roadmap
 
 1. **Secure Telegram bot.** Done.
-2. **Workbook profiling, cleaning and PostgreSQL import; `/projects`, `/search`, `/project`.** Built; awaiting operator check in Telegram.
-3. Claude analysis (`/analyze`) with facts kept separate from inferences.
+2. **Workbook profiling, cleaning and PostgreSQL import; `/projects`, `/search`, `/project`.** Done.
+3. **Claude analysis (`/analyze`, `/categories`) with facts kept separate from inferences.** Built;
+   tested with simulated Claude responses, awaiting a live check with an API key.
 4. Verified product catalogs and grounded recommendations.
 5. Reviewable outreach drafts with prefilled WhatsApp/SMS links (manual send only).
 6. Opportunity ranking, follow-ups and deployment.

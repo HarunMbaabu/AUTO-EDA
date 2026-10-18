@@ -38,7 +38,13 @@ def main(client: Any = None) -> int:
         return 2
 
     if client is None:
-        client = anthropic.Anthropic(timeout=30.0, max_retries=1)
+        from brains_bot.services.analysis import AnalysisError, make_client
+
+        try:
+            client = make_client()
+        except AnalysisError as exc:
+            print(f"FAILED: {exc}")
+            return 2
 
     try:
         reply = check(client, model)
