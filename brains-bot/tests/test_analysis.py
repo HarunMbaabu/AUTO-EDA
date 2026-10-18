@@ -58,9 +58,7 @@ def ctx():
 
 
 def test_scrub_removes_phones_emails_and_names():
-    text = (
-        "Call Mr. Mutua on 0722 123 456 or +254712345678, email a.b@example.com. Eng Otieno too."
-    )
+    text = "Call Mr. Mutua on 0722 123 456 or +254712345678, email a.b@example.com. Eng Otieno too."
     clean = an.scrub(text)
     assert "Mutua" not in clean and "Otieno" not in clean
     assert "722" not in clean and "712345678" not in clean and "example.com" not in clean
