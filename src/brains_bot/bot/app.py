@@ -76,6 +76,7 @@ def build_application(settings: Settings) -> Application:
         "project": project_handlers.project,
         "categories": analysis_handlers.categories,
         "analyze": analysis_handlers.analyze,
+        "analyse": analysis_handlers.analyze,  # British spelling
     }
     for name, callback in commands.items():
         application.add_handler(CommandHandler(name, callback, filters=PRIVATE_CHAT))
