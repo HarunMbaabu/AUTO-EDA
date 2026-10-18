@@ -1,0 +1,37 @@
+# Render Blueprint: an always-on background worker for the bot plus a PostgreSQL database.
+# The bot uses long polling, so it needs no public URL (a worker, not a web service).
+# Secrets marked `sync: false` are entered in the Render dashboard when the Blueprint is created.
+services:
+  - type: worker
+    name: brains-bot
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    preDeployCommand: alembic upgrade head
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: brains-bot-db
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ALLOWED_USER_IDS
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: AI_PROVIDER
+        value: mistral
+      - key: MISTRAL_MODEL
+        value: ministral-14b-latest
+      - key: LOG_LEVEL
+        value: INFO
+
+databases:
+  - name: brains-bot-db
+    plan: basic-256mb
+    databaseName: brains_bot
+    user: brains
+    postgresMajorVersion: "16"
+    ipAllowList: []  # internal connections only; add your IP to import from your computer
