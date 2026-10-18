@@ -31,7 +31,7 @@ from brains_bot.services.analysis import (
 log = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "https://api.deepseek.com"
-DEFAULT_MODEL = "deepseek-chat"
+DEFAULT_MODEL = "deepseek-v4-pro"
 MAX_TOKENS = 4000
 TIMEOUT_SECONDS = 120
 
