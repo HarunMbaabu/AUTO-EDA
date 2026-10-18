@@ -132,7 +132,7 @@ def test_call_is_logged_without_prompt(caplog):
     client, _ = fake_client(response())
     with caplog.at_level("INFO"):
         an.ClaudeAnalyzer(client, "m").analyze(ctx())
-    record = next(r for r in caplog.records if getattr(r, "event", "") == "claude_call")
+    record = next(r for r in caplog.records if getattr(r, "event", "") == "ai_call")
     assert record.input_tokens == 900 and record.output_tokens == 200
     assert "Plastering" not in caplog.text
 

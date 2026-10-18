@@ -13,8 +13,9 @@ REDACTED = "[REDACTED]"
 _PATTERNS = [
     # Telegram bot token: <bot id>:<35-char secret>. No leading \b: in API URLs it follows "bot".
     re.compile(r"(?<!\d)\d{5,}:[A-Za-z0-9_-]{30,}"),
-    # Anthropic API keys
+    # Anthropic API keys (sk-ant-...) and other sk- style keys such as DeepSeek's
     re.compile(r"sk-ant-[A-Za-z0-9_-]+"),
+    re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"),
     # Kenyan mobile numbers: +2547..., 2547..., 07..., 01...
     re.compile(r"(?<!\d)(?:\+?254|0)[17]\d{8}(?!\d)"),
 ]

@@ -70,6 +70,18 @@ class Settings:
     # Whether an Anthropic key is configured. The key itself stays in the environment, where
     # the SDK reads it; it is never copied into settings.
     anthropic_key_present: bool = False
+    # DeepSeek takes priority when its key is set. As with Anthropic, the key stays in the
+    # environment and only its presence is recorded here.
+    deepseek_key_present: bool = False
+    deepseek_model: str | None = None
+
+    @property
+    def ai_provider(self) -> str | None:
+        if self.deepseek_key_present:
+            return "deepseek"
+        if self.anthropic_key_present and self.claude_model:
+            return "anthropic"
+        return None
 
     def is_allowed(self, user_id: int | None) -> bool:
         return user_id is not None and user_id in self.allowed_user_ids
@@ -104,4 +116,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         database_url=database_url,
         claude_model=env.get("CLAUDE_MODEL", "").strip() or None,
         anthropic_key_present=bool(env.get("ANTHROPIC_API_KEY", "").strip()),
+        deepseek_key_present=bool(env.get("DEEPSEEK_API_KEY", "").strip()),
+        deepseek_model=env.get("DEEPSEEK_MODEL", "").strip() or None,
     )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 
 from telegram import Update
@@ -28,18 +29,24 @@ def main() -> int:
         log.error("configuration error: %s. %s", exc, where, extra={"event": "config_error"})
         return 2
 
-    configure_logging(settings.log_level, secrets=[settings.telegram_bot_token])
+    secrets = [settings.telegram_bot_token] + [
+        os.environ.get(name, "") for name in ("DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY")
+    ]
+    configure_logging(settings.log_level, secrets=secrets)
     if not settings.allowed_user_ids:
         log.warning(
             "TELEGRAM_ALLOWED_USER_IDS is empty: every user will be denied private features",
             extra={"event": "empty_allowlist"},
         )
 
-    if not (settings.anthropic_key_present and settings.claude_model):
+    if settings.ai_provider is None:
         log.warning(
-            "Claude analysis disabled: set ANTHROPIC_API_KEY and CLAUDE_MODEL to enable /analyze",
+            "AI analysis disabled: set DEEPSEEK_API_KEY (or ANTHROPIC_API_KEY and CLAUDE_MODEL) "
+            "to enable /analyze",
             extra={"event": "analysis_disabled"},
         )
+    else:
+        log.info(f"AI analysis provider: {settings.ai_provider}", extra={"event": "ai_provider"})
     application = build_application(settings)
     log.info(
         "bot starting (long polling)",
