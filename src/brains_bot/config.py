@@ -64,6 +64,7 @@ class Settings:
     telegram_bot_token: str = field(repr=False)
     allowed_user_ids: frozenset[int]
     log_level: str = "INFO"
+    database_url: str | None = field(default=None, repr=False)
 
     def is_allowed(self, user_id: int | None) -> bool:
         return user_id is not None and user_id in self.allowed_user_ids
@@ -85,4 +86,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     if log_level not in LOG_LEVELS:
         raise ConfigError(f"LOG_LEVEL must be one of {sorted(LOG_LEVELS)}")
 
-    return Settings(telegram_bot_token=token, allowed_user_ids=allowed, log_level=log_level)
+    database_url = env.get("DATABASE_URL", "").strip() or None
+    return Settings(
+        telegram_bot_token=token,
+        allowed_user_ids=allowed,
+        log_level=log_level,
+        database_url=database_url,
+    )

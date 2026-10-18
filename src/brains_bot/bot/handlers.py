@@ -1,4 +1,4 @@
-"""Telegram command handlers for Phase 1."""
+"""Core Telegram command handlers and the access check."""
 
 from __future__ import annotations
 
@@ -23,6 +23,9 @@ PUBLIC_COMMANDS = {
 }
 PRIVATE_COMMANDS = {
     "health": "Confirm the bot is running",
+    "projects": "Browse projects, most recent visit first",
+    "search": "Search by site, area, city or a person/company name",
+    "project": "Show one project, e.g. /project 12",
 }
 
 NOT_AUTHORIZED = (

@@ -4,17 +4,25 @@ A human-in-the-loop sales intelligence assistant for authorized sales operators,
 private Telegram bot. It never sends messages to customers on its own: it prepares, a human
 reviews and sends.
 
-**Current status: Phase 1 (secure Telegram bot).** Data import (Phase 2) and Claude analysis
-(Phase 3) are not built yet.
+**Current status: Phase 2 (workbook import and project lookup).** Claude analysis (Phase 3) is
+not built yet.
 
-## Phase 1 features
+## Commands
 
-| Command   | Who can use it | What it does |
-|-----------|----------------|--------------|
-| `/start`  | Anyone         | Welcome message and access check |
-| `/help`   | Anyone         | Lists commands (private commands only shown to authorized users) |
-| `/myid`   | Anyone         | Shows the caller's numeric Telegram ID, for enrollment |
-| `/health` | Authorized     | Confirms the bot is running, with uptime |
+| Command            | Who can use it | What it does |
+|--------------------|----------------|--------------|
+| `/start`           | Anyone         | Welcome message and access check |
+| `/help`            | Anyone         | Lists commands (private commands only shown to authorized users) |
+| `/myid`            | Anyone         | Shows the caller's numeric Telegram ID, for enrollment |
+| `/health`          | Authorized     | Confirms the bot is running, with uptime |
+| `/projects [page]` | Authorized     | Lists projects, most recent visit first, with Previous/Next buttons |
+| `/search <text>`   | Authorized     | Searches site names, areas, cities, addresses and names of people/companies (not phone numbers) |
+| `/project <number>`| Authorized     | One project: location, parties, paint sales tracking, latest notes, review flags and source rows |
+
+Contact phone numbers are shown masked (`+254 7XX XXX 678`) together with the marketing consent
+status, which the import always sets to **unknown**. Estimated paint start dates are labelled as
+historical estimates, not current site status. Every project view and search is recorded in
+`audit_events` (who and what, never the search text or any phone number).
 
 Security behaviour:
 
@@ -51,6 +59,39 @@ uv run brains-bot            # or: uv run python -m brains_bot
 
 The bot uses long polling, so no public URL is needed. Stop it with Ctrl+C; it shuts down cleanly.
 
+## Database and workbook import
+
+Requires PostgreSQL 14+. Create a database and user, set `DATABASE_URL` in `.env`, then:
+
+```bash
+uv run alembic upgrade head                       # create or update the tables
+mkdir -p data/raw                                 # private: ignored by Git
+cp "/path/to/Physical Projects Mapping Data 6th March.xlsx" data/raw/
+uv run brains-bot-import "data/raw/Physical Projects Mapping Data 6th March.xlsx"
+```
+
+The import:
+
+- reads `Data Base`, `Active Sheet` and `To share with Dealer`, finding the header row in each
+  sheet, and folds follow-up comment rows (merged cells) into their visit;
+- treats `Data Base` as primary and links the other sheets by ID **only when the content
+  agrees** (same phone, or similar site name). IDs in Active Sheet were shifted by inserted
+  rows, so ID-only matching would merge different sites. Uncertain records are kept separate
+  and flagged for review, never merged silently;
+- normalises Kenyan phone numbers to `+254...` only when there is exactly one valid number,
+  keeps the original text, and parses US-style text dates, Excel serial dates and `15.10.25`;
+- stores notes verbatim, imports marketing consent as `unknown`, and loads the dealer shop
+  lists. Pivot sheets (`Sheet1`, `Hit Rate`, `Pivot (2)`) are skipped and recalculated;
+- writes a quality report to `data/processed/import_report_batch_<n>.md` (ignored by Git; it
+  contains site names but no phone numbers).
+
+Salesperson name corrections (e.g. "Jane" -> "Jane Wanjiru") are read from the private file
+`data/name_aliases.json` (ignored by Git, since it holds staff names); see
+`name_aliases.example.json` for the format. Every correction applied is listed in the report.
+
+Re-running with the same file does nothing; `--force` re-imports without creating duplicates.
+Projects that disappear from a newer workbook are flagged, not deleted.
+
 ## Optional: check the Claude API connection
 
 Not used by the bot yet. Set `ANTHROPIC_API_KEY` and `CLAUDE_MODEL` in `.env`, then:
@@ -66,10 +107,21 @@ network error).
 ## Development
 
 ```bash
+uv sync --all-extras         # includes the optional anthropic package
 uv run pytest                # tests
 uv run ruff check .          # lint
 uv run ruff format .         # format
 ```
+
+Database tests run only when `TEST_DATABASE_URL` points at an **empty, disposable** PostgreSQL
+database (they drop and recreate every table), for example:
+
+```bash
+TEST_DATABASE_URL=postgresql://brains:change-me@localhost:5432/brains_bot_test uv run pytest
+```
+
+Tests use a small fictional workbook built in `tests/workbook_factory.py`; no real data is
+committed.
 
 ## Layout
 
@@ -80,16 +132,30 @@ src/brains_bot/
 ├── logging_setup.py         # JSON logs with redaction
 ├── bot/
 │   ├── app.py               # builds the Telegram application, registers handlers
-│   └── handlers.py          # command handlers and the access check
+│   ├── handlers.py          # core commands and the access check
+│   ├── project_handlers.py  # /projects, /search, /project
+│   └── formatting.py        # plain-text message layout
+├── database/
+│   ├── models.py            # SQLAlchemy schema
+│   └── session.py           # engine and sessions
+├── importers/
+│   ├── workbook.py          # reads sheets, finds headers, folds continuation rows
+│   ├── normalize.py         # phones, dates, names, amounts
+│   ├── reconcile.py         # decides which records are the same project
+│   ├── loader.py            # writes to PostgreSQL (idempotent)
+│   ├── report.py            # import quality report
+│   └── cli.py               # brains-bot-import command
 └── services/
+    ├── project_service.py   # project queries and audit log
     └── anthropic_check.py   # optional Claude connectivity check
+migrations/                  # Alembic migrations
 tests/
 ```
 
 ## Roadmap
 
 1. **Secure Telegram bot.** Done.
-2. Workbook profiling, cleaning and PostgreSQL import; `/projects`, `/search`, `/project`.
+2. **Workbook profiling, cleaning and PostgreSQL import; `/projects`, `/search`, `/project`.** Built; awaiting operator check in Telegram.
 3. Claude analysis (`/analyze`) with facts kept separate from inferences.
 4. Verified product catalogs and grounded recommendations.
 5. Reviewable outreach drafts with prefilled WhatsApp/SMS links (manual send only).

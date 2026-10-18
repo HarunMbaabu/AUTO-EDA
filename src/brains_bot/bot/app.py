@@ -5,10 +5,17 @@ from __future__ import annotations
 import time
 
 from telegram import BotCommand
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    MessageHandler,
+    filters,
+)
 
-from brains_bot.bot import handlers
+from brains_bot.bot import handlers, project_handlers
 from brains_bot.config import Settings
+from brains_bot.database.session import make_engine, make_session_factory
 
 # The bot only works in one-to-one chats, so private data never lands in a group.
 PRIVATE_CHAT = filters.ChatType.PRIVATE
@@ -27,11 +34,27 @@ def build_application(settings: Settings) -> Application:
     )
     application.bot_data["settings"] = settings
     application.bot_data["started_at"] = time.monotonic()
+    # The engine connects lazily, so a database that is down does not stop the bot starting.
+    application.bot_data["db"] = (
+        make_session_factory(make_engine(settings.database_url)) if settings.database_url else None
+    )
 
-    application.add_handler(CommandHandler("start", handlers.start, filters=PRIVATE_CHAT))
-    application.add_handler(CommandHandler("help", handlers.help_command, filters=PRIVATE_CHAT))
-    application.add_handler(CommandHandler("myid", handlers.myid, filters=PRIVATE_CHAT))
-    application.add_handler(CommandHandler("health", handlers.health, filters=PRIVATE_CHAT))
+    commands = {
+        "start": handlers.start,
+        "help": handlers.help_command,
+        "myid": handlers.myid,
+        "health": handlers.health,
+        "projects": project_handlers.projects,
+        "search": project_handlers.search,
+        "project": project_handlers.project,
+    }
+    for name, callback in commands.items():
+        application.add_handler(CommandHandler(name, callback, filters=PRIVATE_CHAT))
+    application.add_handler(
+        CallbackQueryHandler(
+            project_handlers.projects_page_callback, pattern=project_handlers.PAGE_CALLBACK
+        )
+    )
     application.add_handler(
         MessageHandler(PRIVATE_CHAT & filters.COMMAND, handlers.unknown_command)
     )

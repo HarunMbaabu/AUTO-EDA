@@ -71,8 +71,38 @@ async def test_text_and_unknown_command_denied_for_strangers(context):
 
 async def test_text_message_content_is_not_logged(context, caplog):
     update = make_update(ALLOWED_ID)
-    update.effective_message.text = "Call Mr Kimani on 0712345678"
+    update.effective_message.text = "Call Mr Mwangi on 0712345678"
     with caplog.at_level(logging.INFO):
         await handlers.text_message(update, context)
-    assert "Kimani" not in caplog.text
+    assert "Mwangi" not in caplog.text
     assert "0712345678" not in caplog.text
+
+
+async def test_project_commands_denied_for_strangers(context):
+    from brains_bot.bot import project_handlers
+
+    for handler in (project_handlers.projects, project_handlers.search, project_handlers.project):
+        update = make_update(STRANGER_ID)
+        await handler(update, context)
+        assert reply_of(update) == handlers.NOT_AUTHORIZED
+
+
+async def test_project_commands_without_database(context):
+    from brains_bot.bot import project_handlers
+
+    context.bot_data["db"] = None
+    update = make_update(ALLOWED_ID)
+    context.args = ["1"]
+    await project_handlers.project(update, context)
+    assert reply_of(update) == project_handlers.NO_DATABASE
+
+
+async def test_project_usage_messages(context):
+    from brains_bot.bot import project_handlers
+
+    context.bot_data["db"] = object()  # never reached: input is rejected first
+    for handler, args in ((project_handlers.project, ["abc"]), (project_handlers.search, ["x"])):
+        update = make_update(ALLOWED_ID)
+        context.args = args
+        await handler(update, context)
+        assert reply_of(update).startswith("Usage:")
