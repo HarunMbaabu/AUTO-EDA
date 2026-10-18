@@ -6,7 +6,7 @@ import pytest
 from brains_bot.config import load_settings
 from brains_bot.logging_setup import redact
 from brains_bot.services.analysis import AnalysisError
-from brains_bot.services.deepseek import DeepSeekAnalyzer
+from brains_bot.services.chat_api import PROVIDERS, ChatAnalyzer, select_provider
 from tests.conftest import FAKE_TOKEN
 from tests.test_analysis import VALID, ctx
 
@@ -36,8 +36,9 @@ def completion(content, finish="stop"):
     }
 
 
-def analyzer(client):
-    return DeepSeekAnalyzer("sk-test", "deepseek-chat", "https://api.deepseek.com", client)
+def analyzer(client, provider="deepseek"):
+    p = PROVIDERS[provider]
+    return ChatAnalyzer(p, "sk-test", None, None, client)
 
 
 def test_successful_analysis_and_request_shape():
@@ -47,6 +48,7 @@ def test_successful_analysis_and_request_shape():
     assert meta.model == "deepseek-chat" and meta.usage.input_tokens == 800
     request = seen[0]
     assert str(request.url) == "https://api.deepseek.com/chat/completions"
+    assert body_model(request) == "deepseek-v4-pro"
     assert request.headers["authorization"] == "Bearer sk-test"
     body = json.loads(request.content)
     assert body["response_format"] == {"type": "json_object"}
@@ -83,12 +85,33 @@ def test_check_lists_models():
     assert analyzer(client).check() == ["deepseek-chat", "deepseek-reasoner"]
 
 
+def body_model(request):
+    return json.loads(request.content)["model"]
+
+
+def test_mistral_uses_its_own_url_and_default_model():
+    seen = []
+    client = server(completion(json.dumps(VALID)), seen=seen)
+    result, _ = analyzer(client, "mistral").analyze(ctx())
+    assert result.fit == "possible"
+    assert str(seen[0].url) == "https://api.mistral.ai/v1/chat/completions"
+    assert body_model(seen[0]) == "mistral-large-latest"
+    with pytest.raises(AnalysisError, match="Mistral API key was rejected"):
+        analyzer(server((401, {})), "mistral").analyze(ctx())
+
+
 def test_provider_selection():
     base = {"TELEGRAM_BOT_TOKEN": FAKE_TOKEN}
     assert load_settings(base).ai_provider is None
     claude = {**base, "ANTHROPIC_API_KEY": "k", "CLAUDE_MODEL": "claude-opus-5-5"}
     assert load_settings(claude).ai_provider == "anthropic"
+    both = {**claude, "DEEPSEEK_API_KEY": "k", "MISTRAL_API_KEY": "k"}
     assert load_settings({**claude, "DEEPSEEK_API_KEY": "k"}).ai_provider == "deepseek"
+    assert load_settings(both).ai_provider == "mistral"  # Mistral first when both are set
+    assert load_settings({**both, "AI_PROVIDER": "deepseek"}).ai_provider == "deepseek"
+    # Asking for a provider without its key disables analysis instead of silently switching.
+    assert load_settings({**claude, "AI_PROVIDER": "mistral"}).ai_provider is None
+    assert select_provider({"MISTRAL_API_KEY": " "}) is None
 
 
 def test_deepseek_style_keys_are_redacted():

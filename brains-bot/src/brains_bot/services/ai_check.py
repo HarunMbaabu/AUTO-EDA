@@ -7,32 +7,33 @@ import sys
 
 from brains_bot.config import load_env_file
 from brains_bot.services.analysis import AnalysisError
-from brains_bot.services.deepseek import DEFAULT_BASE_URL, DEFAULT_MODEL, DeepSeekAnalyzer
+from brains_bot.services.chat_api import ChatAnalyzer, select_provider
 
 
 def main() -> int:
     load_env_file()
-    key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-    if key:
-        model = os.environ.get("DEEPSEEK_MODEL", "").strip() or DEFAULT_MODEL
-        base = os.environ.get("DEEPSEEK_BASE_URL", "").strip() or DEFAULT_BASE_URL
+    provider = select_provider()
+    if provider is not None:
+        analyzer = ChatAnalyzer.from_env(provider)
         try:
-            models = DeepSeekAnalyzer(key, model, base).check()
+            models = analyzer.check()
         except AnalysisError as exc:
-            print(f"FAILED (DeepSeek): {exc}")
+            print(f"FAILED ({provider.label}): {exc}")
             return 1
-        if model not in models:
-            print(f"FAILED (DeepSeek): model '{model}' is not available. Available: {models}")
+        if analyzer.model not in models:
+            print(
+                f"FAILED ({provider.label}): model '{analyzer.model}' is not available. "
+                f"Set {provider.model_env} to one of: {sorted(models)}"
+            )
             return 1
-        print(f"OK: DeepSeek key accepted; model '{model}' is available.")
+        print(f"OK: {provider.label} key accepted; model '{analyzer.model}' is available.")
         return 0
     if os.environ.get("ANTHROPIC_API_KEY", "").strip():
         from brains_bot.services import anthropic_check
 
         return anthropic_check.main()
-    print(
-        "No AI provider configured: set DEEPSEEK_API_KEY (or ANTHROPIC_API_KEY and CLAUDE_MODEL)."
-    )
+    print("No AI provider configured: set MISTRAL_API_KEY or DEEPSEEK_API_KEY "
+          "(or ANTHROPIC_API_KEY and CLAUDE_MODEL).")  # fmt: skip
     return 2
 
 

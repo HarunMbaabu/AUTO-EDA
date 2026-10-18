@@ -20,8 +20,8 @@ from brains_bot.services.categories import active_categories, resolve_category
 log = logging.getLogger(__name__)
 
 NOT_CONFIGURED = (
-    "AI analysis is not configured yet. The administrator needs to set DEEPSEEK_API_KEY "
-    "(or ANTHROPIC_API_KEY and CLAUDE_MODEL)."
+    "AI analysis is not configured yet. The administrator needs to set MISTRAL_API_KEY or "
+    "DEEPSEEK_API_KEY (or ANTHROPIC_API_KEY and CLAUDE_MODEL)."
 )
 
 

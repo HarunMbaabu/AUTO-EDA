@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
 
 from telegram import BotCommand
@@ -21,9 +20,7 @@ from brains_bot.config import Settings
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
 from brains_bot.services.analysis import ClaudeAnalyzer, make_client
 from brains_bot.services.categories import sync_categories
-from brains_bot.services.deepseek import DEFAULT_BASE_URL as DEEPSEEK_DEFAULT_URL
-from brains_bot.services.deepseek import DEFAULT_MODEL as DEEPSEEK_DEFAULT_MODEL
-from brains_bot.services.deepseek import DeepSeekAnalyzer
+from brains_bot.services.chat_api import PROVIDERS, ChatAnalyzer
 
 log = logging.getLogger(__name__)
 
@@ -53,14 +50,10 @@ async def _post_init(application: Application) -> None:
 
 
 def _make_analyzer(settings: Settings):
-    """The AI analyzer for /analyze: DeepSeek if DEEPSEEK_API_KEY is set, else Claude if
-    ANTHROPIC_API_KEY and CLAUDE_MODEL are set, else None (analysis disabled)."""
-    if settings.ai_provider == "deepseek":
-        return DeepSeekAnalyzer(
-            api_key=os.environ["DEEPSEEK_API_KEY"].strip(),
-            model=settings.deepseek_model or DEEPSEEK_DEFAULT_MODEL,
-            base_url=os.environ.get("DEEPSEEK_BASE_URL", "").strip() or DEEPSEEK_DEFAULT_URL,
-        )
+    """The AI analyzer for /analyze: Mistral or DeepSeek (AI_PROVIDER, or whichever key is set),
+    else Claude if ANTHROPIC_API_KEY and CLAUDE_MODEL are set, else None (analysis disabled)."""
+    if settings.ai_provider in PROVIDERS:
+        return ChatAnalyzer.from_env(PROVIDERS[settings.ai_provider])
     if settings.ai_provider == "anthropic":
         return ClaudeAnalyzer(make_client(), settings.claude_model)
     return None

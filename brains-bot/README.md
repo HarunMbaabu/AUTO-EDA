@@ -4,7 +4,7 @@ A human-in-the-loop sales intelligence assistant for authorized sales operators,
 private Telegram bot. It never sends messages to customers on its own: it prepares, a human
 reviews and sends.
 
-**Current status: Phase 3 (AI analysis, using DeepSeek).** Product catalogs (Phase 4) are not built yet.
+**Current status: Phase 3 (AI analysis, using Mistral).** Product catalogs (Phase 4) are not built yet.
 
 ## Commands
 
@@ -118,20 +118,28 @@ Projects that disappear from a newer workbook are flagged, not deleted.
 
 ## AI analysis (`/analyze`)
 
-The operator chose **DeepSeek** as the provider (a change from the original spec, which named
-Claude). Set `DEEPSEEK_API_KEY` (and optionally `DEEPSEEK_MODEL`, default `deepseek-v4-pro`; `deepseek-flash` is the lighter option. `brains-bot-check-ai` lists the models your account can use).
-Claude remains available as an alternative: if no DeepSeek key is set, `ANTHROPIC_API_KEY` and
-`CLAUDE_MODEL` are used. With neither, the bot runs normally and `/analyze` says it is not
-configured. Check the connection (no tokens used for DeepSeek) with:
+The operator chose **Mistral** as the provider (the original spec named Claude). Supported
+providers, in the order they are picked when several keys are set:
+
+| Provider | Key | Model setting (default) | Host to allow |
+|---|---|---|---|
+| Mistral | `MISTRAL_API_KEY` | `MISTRAL_MODEL` (`mistral-large-latest`) | `api.mistral.ai` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` (`deepseek-v4-pro`) | `api.deepseek.com` |
+| Claude | `ANTHROPIC_API_KEY` | `CLAUDE_MODEL` (required) | `api.anthropic.com` |
+
+Set `AI_PROVIDER=mistral|deepseek|anthropic` to choose explicitly; if the chosen provider has
+no key, analysis stays off rather than silently switching. With no provider, the bot runs
+normally and `/analyze` says it is not configured. Check the connection (lists the models your
+key can use; no tokens used for Mistral/DeepSeek) with:
 
 ```bash
 uv run brains-bot-check-ai
 ```
 
-In a cloud environment with limited network access, allow `api.deepseek.com`.
+In a cloud environment with limited network access, allow the provider's host.
 
-**Data protection:** analysis requests go to the chosen provider's servers (DeepSeek's are
-outside Kenya). Only the scrubbed context described below is sent, but confirm the
+**Data protection:** analysis requests go to the chosen provider's servers, which are outside
+Kenya. Only the scrubbed context described below is sent, but confirm the
 cross-border transfer is acceptable under the Kenya Data Protection Act before real use.
 
 How an analysis works:
@@ -151,7 +159,7 @@ How an analysis works:
    never sent. Notes are passed as quoted data and the instructions say to ignore any
    instructions inside them.
 4. **The answer has a fixed structure** (validated against a schema; one retry if it is
-   malformed; Claude enforces the schema server-side, DeepSeek uses JSON mode): fit,
+   malformed; Claude enforces the schema server-side, Mistral and DeepSeek use JSON mode): fit,
    summary, recorded facts with their source, possible needs marked as inferred with a
    confidence, unknowns, a timing comment and a suggested next step. The model is told never to
    invent budgets, preferences, products or prices; no product is named until a verified
@@ -212,7 +220,7 @@ src/brains_bot/
     ├── stages.py            # construction stage detection and category timing
     ├── categories.py        # category sync and lookup
     ├── analysis.py          # AI context, prompt, answer schema, Claude analyzer, saving
-    ├── deepseek.py          # DeepSeek analyzer (same context and schema)
+    ├── chat_api.py          # Mistral / DeepSeek analyzer (same context and schema)
     ├── ai_check.py          # brains-bot-check-ai
     └── anthropic_check.py   # Claude connectivity check
 migrations/                  # Alembic migrations
@@ -224,7 +232,7 @@ tests/
 1. **Secure Telegram bot.** Done.
 2. **Workbook profiling, cleaning and PostgreSQL import; `/projects`, `/search`, `/project`.** Done.
 3. **AI analysis (`/analyze`, `/categories`) with facts kept separate from inferences.** Built;
-   tested with simulated DeepSeek and Claude responses, awaiting a live check.
+   tested with simulated Mistral, DeepSeek and Claude responses, awaiting a live check.
 4. Verified product catalogs and grounded recommendations.
 5. Reviewable outreach drafts with prefilled WhatsApp/SMS links (manual send only).
 6. Opportunity ranking, follow-ups and deployment.
