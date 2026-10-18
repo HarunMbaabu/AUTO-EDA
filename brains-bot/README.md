@@ -123,7 +123,7 @@ providers, in the order they are picked when several keys are set:
 
 | Provider | Key | Model setting (default) | Host to allow |
 |---|---|---|---|
-| Mistral | `MISTRAL_API_KEY` | `MISTRAL_MODEL` (`mistral-large-latest`) | `api.mistral.ai` |
+| Mistral | `MISTRAL_API_KEY` | `MISTRAL_MODEL` (`ministral-14b-latest`) | `api.mistral.ai` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` (`deepseek-v4-pro`) | `api.deepseek.com` |
 | Claude | `ANTHROPIC_API_KEY` | `CLAUDE_MODEL` (required) | `api.anthropic.com` |
 
