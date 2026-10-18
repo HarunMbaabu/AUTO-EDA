@@ -59,10 +59,10 @@ def ctx():
 
 def test_scrub_removes_phones_emails_and_names():
     text = (
-        "Call Mr. Wekesa on 0722 123 456 or +254712345678, email a.b@example.com. Eng Otieno too."
+        "Call Mr. Mutua on 0722 123 456 or +254712345678, email a.b@example.com. Eng Otieno too."
     )
     clean = an.scrub(text)
-    assert "Wekesa" not in clean and "Otieno" not in clean
+    assert "Mutua" not in clean and "Otieno" not in clean
     assert "722" not in clean and "712345678" not in clean and "example.com" not in clean
     assert clean.count("[person]") == 2 and clean.count("[phone]") == 2 and "[email]" in clean
 
@@ -140,10 +140,10 @@ def test_call_is_logged_without_prompt(caplog):
 
 
 def test_scrub_removes_recorded_names_without_titles():
-    names = an.name_tokens(["Mr. Eliud Kamau", "Sketch Studio Ltd", "TBC"])
-    assert names == {"Eliud", "Kamau", "Sketch"}
-    clean = an.scrub("Eliud Kamau said skimming is done; eliud will call.", names)
-    assert "Eliud" not in clean and "eliud" not in clean and "Kamau" not in clean
+    names = an.name_tokens(["Mr. Baraka Njoroge", "Kito Studio Ltd", "TBC"])
+    assert names == {"Baraka", "Njoroge", "Kito"}
+    clean = an.scrub("Baraka Njoroge said skimming is done; baraka will call.", names)
+    assert "Baraka" not in clean and "baraka" not in clean and "Njoroge" not in clean
     assert clean.startswith("[person] said skimming is done")
 
 
