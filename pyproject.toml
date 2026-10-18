@@ -1,0 +1,44 @@
+[project]
+name = "brains-bot"
+version = "0.1.0"
+description = "Human-in-the-loop sales intelligence Telegram bot"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "python-dotenv>=1.2.4",
+    "python-telegram-bot>=21",
+]
+
+[project.optional-dependencies]
+anthropic = [
+    "anthropic>=1.15.0",
+]
+
+[project.scripts]
+brains-bot = "brains_bot.__main__:main"
+brains-bot-check-anthropic = "brains_bot.services.anthropic_check:main"
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
