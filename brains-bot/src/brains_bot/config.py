@@ -3,10 +3,38 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
+from pathlib import Path
+
+from dotenv import dotenv_values
 
 LOG_LEVELS = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"}
+
+# brains-bot/ (the folder holding pyproject.toml), resolved from src/brains_bot/config.py.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def env_file_candidates() -> list[Path]:
+    return list(dict.fromkeys([Path.cwd() / ".env", PROJECT_ROOT / ".env"]))
+
+
+def load_env_file(
+    candidates: list[Path] | None = None, env: MutableMapping[str, str] | None = None
+) -> Path | None:
+    """Load the first .env found into the environment and return its path.
+
+    A variable that is already set to a non-empty value wins over .env, but an empty one
+    (e.g. a stray `export TELEGRAM_BOT_TOKEN=`) is filled from .env.
+    """
+    env = os.environ if env is None else env
+    for path in env_file_candidates() if candidates is None else candidates:
+        if path.is_file():
+            for key, value in dotenv_values(path).items():
+                if value is not None and not env.get(key, "").strip():
+                    env[key] = value
+            return path
+    return None
 
 
 class ConfigError(ValueError):
