@@ -78,6 +78,9 @@ class Project(TimestampMixin, Base):
     site_visit_date: Mapped[date | None] = mapped_column(Date)
     # Historical estimate recorded at the visit. Not evidence of current site status.
     est_paint_start: Mapped[date | None] = mapped_column(Date)
+    # From the "Audio Status" column, only when the import is told it holds real audio data
+    # (--audio-status status). Free text, stored verbatim.
+    audio_status: Mapped[str | None] = mapped_column(Text)
     needs_review: Mapped[bool] = mapped_column(default=False)
     review_reasons: Mapped[list[Any]] = mapped_column(default=list)
     last_batch_id: Mapped[int | None] = mapped_column(ForeignKey("import_batches.id"))

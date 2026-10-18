@@ -240,3 +240,33 @@ def test_slim_export_import(factory, tmp_path):
     assert "'Sr No.' read as 'ID'" in report
     assert "2 filled, 0 mention audio-related words" in report
     assert "Present but empty: Column2, Column1" in report
+
+
+def test_audio_status_mode_stores_column_as_status(factory, tmp_path):
+    from tests.workbook_factory import build_slim_workbook
+
+    path = build_slim_workbook(tmp_path / "slim.xlsx")
+    with session_scope(factory) as session:
+        stats, result, workbook = run_import(session, path, audio_status_mode="status")
+    with session_scope(factory) as s:
+        sunrise = _project(s, "db:2")
+        assert sunrise.audio_status == (
+            "Foundation stage.\nFollow-up: meeting with the architect next week."
+        )
+        assert sunrise.notes == []  # not duplicated as notes
+        assert _project(s, "db:3").audio_status is None
+        detail = svc.get_project(s, sunrise.id)
+        assert detail.audio_status.startswith("Foundation stage.")
+    report = build_report(stats, result, workbook, path.name)
+    assert "imported as the project's audio status (2 projects)" in report
+
+
+def test_audio_status_defaults_to_notes(factory, tmp_path):
+    from tests.workbook_factory import build_slim_workbook
+
+    _import(factory, build_slim_workbook(tmp_path / "slim.xlsx"))
+    with session_scope(factory) as s:
+        sunrise = _project(s, "db:2")
+        assert sunrise.audio_status is None and len(sunrise.notes) == 2
+    with pytest.raises(ValueError), session_scope(factory) as session:
+        run_import(session, tmp_path / "slim.xlsx", force=True, audio_status_mode="maybe")

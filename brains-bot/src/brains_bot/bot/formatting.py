@@ -77,6 +77,9 @@ def project_detail(d: ProjectDetail) -> str:
             "(estimate recorded at the visit, not a verified current status)"
         )
 
+    audio = truncate(d.audio_status, NOTE_PREVIEW) if d.audio_status else "not recorded yet"
+    out.append(f"Audio status: {audio}")
+
     if d.contacts:
         out += ["", "People and companies"]
         out += [_contact_line(c) for c in d.contacts]
@@ -93,7 +96,7 @@ def project_detail(d: ProjectDetail) -> str:
     ]
     tracking = [(k, v) for k, v in tracking if v]
     if tracking:
-        out += ["", "Sales tracking (paint)"]
+        out += ["", "Sales tracking"]
         out += [f"{k}: {v}" for k, v in tracking]
 
     if d.notes:

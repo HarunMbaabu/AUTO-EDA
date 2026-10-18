@@ -49,6 +49,7 @@ class ProjectDetail:
     address: str | None
     google_location_url: str | None
     est_paint_start: date | None
+    audio_status: str | None
     salesperson: str | None
     sar: str | None
     dealer_to_route: str | None
@@ -135,6 +136,7 @@ def get_project(session: Session, project_id: int, note_limit: int = 3) -> Proje
         address=project.address,
         google_location_url=project.google_location_url,
         est_paint_start=project.est_paint_start,
+        audio_status=project.audio_status,
         salesperson=sales.salesperson if sales else None,
         sar=sales.sar if sales else None,
         dealer_to_route=sales.dealer_to_route if sales else None,

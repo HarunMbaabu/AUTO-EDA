@@ -36,9 +36,12 @@ ROLE_COLUMNS = {
     "contact_person": "Contact Person Name",
 }
 ORGANISATION_ROLES = {"contractor", "company"}
-# "Audio Status" in the slimmed-down export holds the same site/paint notes as "Comments (If Any)"
-# in the full export; it is imported as a note, never as evidence of interest in audio.
-NOTE_COLUMNS = ("Comments (If Any)", "Audio Status", "Jotun Comments")
+NOTE_COLUMNS = ("Comments (If Any)", "Jotun Comments")
+AUDIO_STATUS = "Audio Status"
+# How to treat the "Audio Status" column. In the current workbook it holds copied site/paint
+# notes, so the default files it under notes. Once it holds real audio information, import with
+# audio_status_mode="status" to store it in projects.audio_status instead.
+AUDIO_STATUS_MODES = ("notes", "status")
 TRACKING_COLUMNS = {
     "site_visited_by_dealer": "Site Visited by Dealer/ODS",
     "quotation_shared": "Quotation Shared",
@@ -68,6 +71,8 @@ class ImportStats:
     dealer_duplicates: int = 0
     won_lost_by_dealer: dict[str, Counter[str]] = field(default_factory=dict)
     stale: list[tuple[str, str]] = field(default_factory=list)
+    audio_status_mode: str = "notes"
+    audio_statuses: int = 0
 
 
 def file_sha256(path: Path) -> str:
@@ -105,11 +110,14 @@ class Loader:
         stats: ImportStats,
         batch: ImportBatch,
         aliases: dict[str, str] | None = None,
+        audio_status_mode: str = "notes",
     ) -> None:
         self.session = session
         self.stats = stats
         self.batch = batch
         self.aliases = aliases or {}
+        self.audio_as_status = audio_status_mode == "status"
+        self.note_columns = NOTE_COLUMNS if self.audio_as_status else (*NOTE_COLUMNS, AUDIO_STATUS)
         self.source_ids: dict[tuple[str, int], int] = {}
 
     # -- source records --------------------------------------------------------------------
@@ -156,6 +164,7 @@ class Loader:
         project.google_location_url = url if url and url.startswith("http") else None
         project.site_visit_date = self._date(primary, rows, "Date of Site Visit")
         project.est_paint_start = self._date(primary, rows, "Estimated Paint Start Time Line")
+        project.audio_status = self._audio_status(draft) if self.audio_as_status else None
         reasons = list(draft.review_reasons) + self._check_dates(primary, project)
         project.review_reasons = reasons
         project.needs_review = bool(reasons)
@@ -191,6 +200,19 @@ class Loader:
             if value:
                 return value
         return None
+
+    def _audio_status(self, draft: ProjectDraft) -> str | None:
+        """All "Audio Status" texts for the project (follow-up rows included), verbatim."""
+        texts: list[str] = []
+        for row in draft.rows():
+            values = [row.get(AUDIO_STATUS)] + [v for c, v in row.extra if c == AUDIO_STATUS]
+            for value in values:
+                text = value.strip() if isinstance(value, str) else n.clean_text(value)
+                if text and text not in texts:
+                    texts.append(text)
+        if texts:
+            self.stats.audio_statuses += 1
+        return "\n".join(texts) or None
 
     def _check_dates(self, row: SourceRow, project: Project) -> list[str]:
         problems: list[str] = []
@@ -280,8 +302,8 @@ class Loader:
     def _add_notes(self, project: Project, draft: ProjectDraft) -> None:
         candidates: list[tuple[str, str, SourceRow]] = []  # (column, text, row)
         for row in draft.rows():
-            entries = [(c, row.get(c)) for c in NOTE_COLUMNS]
-            entries += [(c, v) for c, v in row.extra if c in NOTE_COLUMNS]
+            entries = [(c, row.get(c)) for c in self.note_columns]
+            entries += [(c, v) for c, v in row.extra if c in self.note_columns]
             for column, value in entries:
                 text = value.strip() if isinstance(value, str) else n.clean_text(value)
                 if text:
@@ -394,9 +416,15 @@ def _flag_stale_projects(session: Session, stats: ImportStats, batch: ImportBatc
 
 
 def run_import(
-    session: Session, path: Path, force: bool = False, aliases: dict[str, str] | None = None
+    session: Session,
+    path: Path,
+    force: bool = False,
+    aliases: dict[str, str] | None = None,
+    audio_status_mode: str = "notes",
 ) -> tuple[ImportStats, Reconciliation | None, Workbook | None]:
-    stats = ImportStats()
+    if audio_status_mode not in AUDIO_STATUS_MODES:
+        raise ValueError(f"audio_status_mode must be one of {AUDIO_STATUS_MODES}")
+    stats = ImportStats(audio_status_mode=audio_status_mode)
     sha = file_sha256(path)
     previous = session.scalar(
         select(ImportBatch).where(ImportBatch.file_sha256 == sha, ImportBatch.status == "completed")
@@ -414,7 +442,7 @@ def run_import(
     session.flush()
     stats.batch_id = batch.id
 
-    loader = Loader(session, stats, batch, aliases)
+    loader = Loader(session, stats, batch, aliases, audio_status_mode)
     loader.add_source_records(workbook)
     for draft in result.projects:
         loader.upsert_project(draft)
@@ -430,6 +458,7 @@ def run_import(
         "contacts_created": stats.contacts,
         "dealer_shops": stats.dealer_shops,
         "stale_projects": len(stats.stale),
+        "audio_status_mode": audio_status_mode,
     }
     session.flush()
     return stats, result, workbook
