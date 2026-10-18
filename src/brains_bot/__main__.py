@@ -30,7 +30,8 @@ def main() -> int:
         return 2
 
     secrets = [settings.telegram_bot_token] + [
-        os.environ.get(name, "") for name in ("DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY")
+        os.environ.get(name, "")
+        for name in ("MISTRAL_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY")
     ]
     configure_logging(settings.log_level, secrets=secrets)
     if not settings.allowed_user_ids:
@@ -41,8 +42,8 @@ def main() -> int:
 
     if settings.ai_provider is None:
         log.warning(
-            "AI analysis disabled: set DEEPSEEK_API_KEY (or ANTHROPIC_API_KEY and CLAUDE_MODEL) "
-            "to enable /analyze",
+            "AI analysis disabled: set MISTRAL_API_KEY or DEEPSEEK_API_KEY (or ANTHROPIC_API_KEY "
+            "and CLAUDE_MODEL) to enable /analyze",
             extra={"event": "analysis_disabled"},
         )
     else:
