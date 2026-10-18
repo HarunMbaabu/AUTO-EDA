@@ -70,7 +70,7 @@ def _summary(p: Project) -> ProjectSummary:
     return ProjectSummary(p.id, p.name, p.area, p.city, p.site_visit_date, p.needs_review)
 
 
-def _ordered():
+def ordered_projects():
     return select(Project).order_by(Project.site_visit_date.desc().nulls_last(), Project.id.desc())
 
 
@@ -79,33 +79,35 @@ def list_projects(session: Session, page: int) -> tuple[list[ProjectSummary], in
     total = session.scalar(select(func.count(Project.id))) or 0
     pages = max(1, -(-total // PAGE_SIZE))
     page = min(max(page, 1), pages)
-    rows = session.scalars(_ordered().offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE))
+    rows = session.scalars(ordered_projects().offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE))
     return [_summary(p) for p in rows], pages
 
 
-def _like(term: str) -> str:
+def like_pattern(term: str) -> str:
     escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
 
 
-def search_projects(session: Session, term: str) -> list[ProjectSummary]:
+def search_clause(term: str):
     """Match site name, area, city, address, or the names of linked people and companies.
     Phone numbers are deliberately not searchable."""
-    pattern = _like(term.strip())
+    pattern = like_pattern(term.strip())
     contact_match = (
         select(ProjectContact.project_id)
         .join(Contact, Contact.id == ProjectContact.contact_id)
         .where(Contact.name.ilike(pattern, escape="\\"))
     )
-    query = _ordered().where(
-        or_(
-            Project.name.ilike(pattern, escape="\\"),
-            Project.area.ilike(pattern, escape="\\"),
-            Project.city.ilike(pattern, escape="\\"),
-            Project.address.ilike(pattern, escape="\\"),
-            Project.id.in_(contact_match),
-        )
+    return or_(
+        Project.name.ilike(pattern, escape="\\"),
+        Project.area.ilike(pattern, escape="\\"),
+        Project.city.ilike(pattern, escape="\\"),
+        Project.address.ilike(pattern, escape="\\"),
+        Project.id.in_(contact_match),
     )
+
+
+def search_projects(session: Session, term: str) -> list[ProjectSummary]:
+    query = ordered_projects().where(search_clause(term))
     return [_summary(p) for p in session.scalars(query.limit(SEARCH_LIMIT))]
 
 

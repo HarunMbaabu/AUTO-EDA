@@ -19,6 +19,8 @@ reviews and sends.
 | `/project <number>`| Authorized     | One project: location, audio status, people, latest notes, review flags and source rows |
 | `/categories`      | Authorized     | Product categories and the construction stages when each is best pitched |
 | `/analyze <number> <category> [refresh]` | Authorized | AI assessment: fit, timing, recorded facts, inferred needs, unknowns, next step |
+| Any plain message | Authorized | Chat mode: ask in your own words, e.g. "which projects in Ruiru are at painting stage?" |
+| `/newchat`         | Authorized     | Starts a new conversation (forgets earlier questions) |
 | `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
 
 An uploaded workbook is saved only to a temporary folder for the import and deleted right after;
@@ -144,6 +146,23 @@ otherwise those fields stay empty.
 
 Re-running with the same file does nothing; `--force` re-imports without creating duplicates.
 Projects that disappear from a newer workbook are flagged, not deleted.
+
+## Chat mode
+
+Any message that is not a command is answered from the project database. The AI provider
+(Mistral or DeepSeek; Claude is not used for chat) never queries the database itself: it calls
+five tools that the bot runs locally (`find_projects`, `count_projects`, `get_project`,
+`analyze_opportunity`, `list_categories`) and writes the answer from what they return.
+
+- **What leaves the bot:** your question, the last three questions and answers (for follow-ups,
+  kept for 30 minutes or until `/newchat`), and tool results: project, area, city and people's
+  names, visit dates, detected stages and site notes. **Phone numbers and email addresses are
+  never sent**: they are left out of tool results, scrubbed from notes, and scrubbed from the
+  answer too. For contact details the bot points to `/project <number>`.
+- Stages come from the same note-based detection as `/analyze`; projects whose notes mention no
+  stage count as "not recorded".
+- Questions are not logged; each answer records a `chat` audit event with the project numbers
+  it looked at.
 
 ## AI analysis (`/analyze`)
 

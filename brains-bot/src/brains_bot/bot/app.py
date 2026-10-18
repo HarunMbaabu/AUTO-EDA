@@ -15,11 +15,18 @@ from telegram.ext import (
     filters,
 )
 
-from brains_bot.bot import analysis_handlers, handlers, import_handlers, project_handlers
+from brains_bot.bot import (
+    analysis_handlers,
+    chat_handlers,
+    handlers,
+    import_handlers,
+    project_handlers,
+)
 from brains_bot.config import Settings
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
 from brains_bot.services.analysis import ClaudeAnalyzer, make_client
 from brains_bot.services.categories import sync_categories
+from brains_bot.services.chat import ChatAssistant
 from brains_bot.services.chat_api import PROVIDERS, ChatAnalyzer
 
 log = logging.getLogger(__name__)
@@ -69,7 +76,12 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["db"] = (
         make_session_factory(make_engine(settings.database_url)) if settings.database_url else None
     )
-    application.bot_data["analyzer"] = _make_analyzer(settings)
+    analyzer = _make_analyzer(settings)
+    application.bot_data["analyzer"] = analyzer
+    # Chat mode needs tool calling, which the chat-completions providers (Mistral, DeepSeek) offer.
+    application.bot_data["assistant"] = (
+        ChatAssistant(analyzer) if isinstance(analyzer, ChatAnalyzer) else None
+    )
 
     commands = {
         "start": handlers.start,
@@ -83,6 +95,7 @@ def build_application(settings: Settings) -> Application:
         "analyze": analysis_handlers.analyze,
         "analyse": analysis_handlers.analyze,  # British spelling
         "import": import_handlers.import_help,
+        "newchat": chat_handlers.new_chat,
     }
     for name, callback in commands.items():
         application.add_handler(CommandHandler(name, callback, filters=PRIVATE_CHAT))
@@ -95,7 +108,7 @@ def build_application(settings: Settings) -> Application:
         MessageHandler(PRIVATE_CHAT & filters.COMMAND, handlers.unknown_command)
     )
     application.add_handler(
-        MessageHandler(PRIVATE_CHAT & filters.TEXT & ~filters.COMMAND, handlers.text_message)
+        MessageHandler(PRIVATE_CHAT & filters.TEXT & ~filters.COMMAND, chat_handlers.chat_message)
     )
     application.add_handler(
         MessageHandler(PRIVATE_CHAT & filters.Document.ALL, import_handlers.workbook_upload)

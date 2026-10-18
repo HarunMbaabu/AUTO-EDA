@@ -62,20 +62,10 @@ async def test_health_denied_without_user(context):
     assert reply_of(update) == handlers.NOT_AUTHORIZED
 
 
-async def test_text_and_unknown_command_denied_for_strangers(context):
-    for handler in (handlers.text_message, handlers.unknown_command):
-        update = make_update(STRANGER_ID)
-        await handler(update, context)
-        assert reply_of(update) == handlers.NOT_AUTHORIZED
-
-
-async def test_text_message_content_is_not_logged(context, caplog):
-    update = make_update(ALLOWED_ID)
-    update.effective_message.text = "Call Mr Mwangi on 0712345678"
-    with caplog.at_level(logging.INFO):
-        await handlers.text_message(update, context)
-    assert "Mwangi" not in caplog.text
-    assert "0712345678" not in caplog.text
+async def test_unknown_command_denied_for_strangers(context):
+    update = make_update(STRANGER_ID)
+    await handlers.unknown_command(update, context)
+    assert reply_of(update) == handlers.NOT_AUTHORIZED
 
 
 async def test_project_commands_denied_for_strangers(context):

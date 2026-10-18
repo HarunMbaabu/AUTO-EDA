@@ -30,6 +30,7 @@ PRIVATE_COMMANDS = {
     "categories": "Product categories and their best timing",
     "analyze": "Claude analysis for a project and category, e.g. /analyze 12 audio",
     "import": "How to load or update the data: send the workbook (.xlsx) as a file",
+    "newchat": "Start a new conversation (or just ask a question in plain words)",
 }
 
 NOT_AUTHORIZED = (
@@ -129,18 +130,6 @@ async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.effective_message.reply_text(NOT_AUTHORIZED)
         return
     await update.effective_message.reply_text("Unknown command. Send /help for the list.")
-
-
-async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Message text is never logged: it may contain customer data.
-    authorized = _is_authorized(update, context)
-    _log_command(update, "text", authorized)
-    if not authorized:
-        await update.effective_message.reply_text(NOT_AUTHORIZED)
-        return
-    await update.effective_message.reply_text(
-        "I only understand commands for now. Send /help for the list."
-    )
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
