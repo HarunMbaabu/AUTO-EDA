@@ -13,14 +13,14 @@ class FakeMessages:
 
 
 def test_missing_model_exits_without_calling_api(monkeypatch, capsys):
-    monkeypatch.setattr(anthropic_check, "load_dotenv", lambda: None)
+    monkeypatch.setattr(anthropic_check, "load_env_file", lambda: None)
     monkeypatch.delenv("CLAUDE_MODEL", raising=False)
     assert anthropic_check.main(client=object()) == 2
     assert "CLAUDE_MODEL" in capsys.readouterr().out
 
 
 def test_success_with_fake_client(monkeypatch, capsys):
-    monkeypatch.setattr(anthropic_check, "load_dotenv", lambda: None)
+    monkeypatch.setattr(anthropic_check, "load_env_file", lambda: None)
     monkeypatch.setenv("CLAUDE_MODEL", "test-model")
     client = SimpleNamespace(messages=FakeMessages())
     assert anthropic_check.main(client=client) == 0

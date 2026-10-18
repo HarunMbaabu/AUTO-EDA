@@ -9,7 +9,7 @@ import os
 import sys
 from typing import Any
 
-from dotenv import load_dotenv
+from brains_bot.config import load_env_file
 
 PROMPT = "Reply with the single word: pong"
 
@@ -25,7 +25,7 @@ def check(client: Any, model: str) -> str:
 
 
 def main(client: Any = None) -> int:
-    load_dotenv()
+    load_env_file()
     model = os.environ.get("CLAUDE_MODEL", "").strip()
     if not model:
         print("CLAUDE_MODEL is not set. Add it to .env (e.g. CLAUDE_MODEL=claude-opus-5-5).")

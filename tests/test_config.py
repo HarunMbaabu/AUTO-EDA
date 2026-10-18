@@ -1,6 +1,6 @@
 import pytest
 
-from brains_bot.config import ConfigError, load_settings, parse_user_ids
+from brains_bot.config import ConfigError, load_env_file, load_settings, parse_user_ids
 from tests.conftest import FAKE_TOKEN
 
 
@@ -42,3 +42,17 @@ def test_invalid_log_level():
 def test_token_not_in_repr():
     s = load_settings({"TELEGRAM_BOT_TOKEN": FAKE_TOKEN})
     assert FAKE_TOKEN not in repr(s)
+
+
+def test_load_env_file_fills_unset_and_empty_but_keeps_set_values(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text("TELEGRAM_BOT_TOKEN=from-file\nLOG_LEVEL=DEBUG\nCLAUDE_MODEL=file-model\n")
+    env = {"TELEGRAM_BOT_TOKEN": "", "LOG_LEVEL": "WARNING"}
+    assert load_env_file([tmp_path / "missing.env", env_file], env) == env_file
+    assert env["TELEGRAM_BOT_TOKEN"] == "from-file"  # empty value was filled
+    assert env["LOG_LEVEL"] == "WARNING"  # non-empty value wins
+    assert env["CLAUDE_MODEL"] == "file-model"  # unset value was filled
+
+
+def test_load_env_file_returns_none_when_missing(tmp_path):
+    assert load_env_file([tmp_path / ".env"], {}) is None

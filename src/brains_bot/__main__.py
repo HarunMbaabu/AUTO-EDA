@@ -5,23 +5,27 @@ from __future__ import annotations
 import logging
 import sys
 
-from dotenv import load_dotenv
 from telegram import Update
 
 from brains_bot.bot.app import build_application
-from brains_bot.config import ConfigError, load_settings
+from brains_bot.config import ConfigError, env_file_candidates, load_env_file, load_settings
 from brains_bot.logging_setup import configure_logging
 
 log = logging.getLogger("brains_bot")
 
 
 def main() -> int:
-    load_dotenv()  # values already in the environment take precedence over .env
+    env_file = load_env_file()
     try:
         settings = load_settings()
     except ConfigError as exc:
         configure_logging()
-        log.error("configuration error: %s", exc, extra={"event": "config_error"})
+        if env_file:
+            where = f"{env_file} was loaded; check the value there"
+        else:
+            looked = ", ".join(str(p) for p in env_file_candidates())
+            where = f"no .env file found (looked in: {looked}); copy .env.example to .env"
+        log.error("configuration error: %s. %s", exc, where, extra={"event": "config_error"})
         return 2
 
     configure_logging(settings.log_level, secrets=[settings.telegram_bot_token])
