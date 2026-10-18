@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -81,6 +82,11 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     token = env.get("TELEGRAM_BOT_TOKEN", "").strip()
     if not token:
         raise ConfigError("TELEGRAM_BOT_TOKEN is not set")
+    if not re.match(r"^\d+:[A-Za-z0-9_-]{20,}$", token):
+        raise ConfigError(
+            "TELEGRAM_BOT_TOKEN looks incomplete: it should be '<bot number>:<secret>', "
+            "e.g. 123456789:AAH... (copy the whole line from @BotFather)"
+        )
 
     # TELEGRAM_ALLOWED_USER_ID (singular) is accepted for compatibility with the spec.
     raw_ids = env.get("TELEGRAM_ALLOWED_USER_IDS") or env.get("TELEGRAM_ALLOWED_USER_ID")

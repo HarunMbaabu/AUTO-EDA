@@ -56,3 +56,8 @@ def test_load_env_file_fills_unset_and_empty_but_keeps_set_values(tmp_path):
 
 def test_load_env_file_returns_none_when_missing(tmp_path):
     assert load_env_file([tmp_path / ".env"], {}) is None
+
+
+def test_token_without_bot_number_is_rejected_clearly():
+    with pytest.raises(ConfigError, match="looks incomplete"):
+        load_settings({"TELEGRAM_BOT_TOKEN": "AAH0YZ1Mq_WGCMXZGRFFN1RtVNvdqzQKEWX"})
