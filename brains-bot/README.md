@@ -52,6 +52,17 @@ cp .env.example .env         # then edit .env
    (comma-separate several IDs).
 3. Restart the bot. `/health` should now reply `OK`.
 
+## Quick setup in a fresh cloud or dev container
+
+```bash
+bash scripts/cloud_setup.sh   # PostgreSQL, dependencies, tables, categories, import
+uv run brains-bot
+```
+
+The script is safe to re-run. It reports which secrets are missing (`TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_ALLOWED_USER_IDS`, `ANTHROPIC_API_KEY`); set them in the environment settings or in
+`.env`. The private workbook has to be put in `data/raw/` by hand.
+
 ## Run
 
 ```bash
