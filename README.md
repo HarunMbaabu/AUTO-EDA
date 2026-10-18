@@ -17,7 +17,7 @@ not built yet.
 | `/health`          | Authorized     | Confirms the bot is running, with uptime |
 | `/projects [page]` | Authorized     | Lists projects, most recent visit first, with Previous/Next buttons |
 | `/search <text>`   | Authorized     | Searches site names, areas, cities, addresses and names of people/companies (not phone numbers) |
-| `/project <number>`| Authorized     | One project: location, parties, paint sales tracking, latest notes, review flags and source rows |
+| `/project <number>`| Authorized     | One project: location, audio status, people, latest notes, review flags and source rows |
 
 Contact phone numbers are shown masked (`+254 7XX XXX 678`) together with the marketing consent
 status, which the import always sets to **unknown**. Estimated paint start dates are labelled as
@@ -78,7 +78,10 @@ The import:
   `Phone Number (WhatsApp)`, `Audio Status`). Column names are mapped on read, the original
   names are kept for provenance, and the report lists renamed, missing and empty columns.
   In the current file `Audio Status` holds the same site/paint progress notes as the old
-  `Comments` column, so it is imported as notes, never as evidence of interest in audio;
+  `Comments` column, so by default it is imported as notes, never as evidence of interest in
+  audio. Once the column holds real audio information, re-import with
+  `--audio-status status --force` to store it as each project's audio status (shown in
+  `/project`). The report states which mode was used;
 - treats `Data Base` as primary and links the other sheets by ID **only when the content
   agrees** (same phone, or similar site name). IDs in Active Sheet were shifted by inserted
   rows, so ID-only matching would merge different sites. Uncertain records are kept separate
@@ -93,6 +96,10 @@ The import:
 Salesperson name corrections (e.g. "Jane" -> "Jane Wanjiru") are read from the private file
 `data/name_aliases.json` (ignored by Git, since it holds staff names); see
 `name_aliases.example.json` for the format. Every correction applied is listed in the report.
+
+The bot works from the slimmed-down, audio-focused workbook. Paint sales columns (salesperson,
+dealer, quotations, won/lost) are optional: when a file has them they are imported and shown,
+otherwise those fields stay empty.
 
 Re-running with the same file does nothing; `--force` re-imports without creating duplicates.
 Projects that disappear from a newer workbook are flagged, not deleted.

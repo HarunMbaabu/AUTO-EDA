@@ -23,7 +23,7 @@ AUDIO_WORDS = re.compile(
 )
 
 
-def _columns_section(workbook: Workbook) -> list[str]:
+def _columns_section(workbook: Workbook, stats: ImportStats) -> list[str]:
     out = ["## Columns", ""]
     for sheet in PROJECT_SHEETS:
         if sheet not in workbook.headers:
@@ -46,10 +46,19 @@ def _columns_section(workbook: Workbook) -> list[str]:
         if "Audio Status" in mapping:
             notes = [r.get("Audio Status") for r in rows if r.get("Audio Status")]
             audio = sum(1 for t in notes if AUDIO_WORDS.search(str(t)))
+            if stats.audio_status_mode == "status":
+                how = (
+                    f"imported as the project's audio status ({stats.audio_statuses} projects). "
+                    "Check this column really holds audio information."
+                )
+            else:
+                how = (
+                    "imported as site notes, not as an audio status or evidence of interest in "
+                    "audio products. Re-import with --audio-status status --force once the "
+                    "column holds real audio information."
+                )
             out.append(
-                f"- 'Audio Status': {len(notes)} filled, {audio} mention audio-related words. "
-                "It is imported as a site note, not as an audio status or evidence of interest "
-                "in audio products."
+                f"- 'Audio Status': {len(notes)} filled, {audio} mention audio-related words; {how}"
             )
         out.append("")
     return out
@@ -112,7 +121,7 @@ def build_report(
         "",
     ]
 
-    out += _columns_section(workbook)
+    out += _columns_section(workbook, stats)
 
     out += ["## Reconciliation policy", "", POLICY.strip(), ""]
     methods: dict[str, int] = {}

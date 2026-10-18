@@ -9,7 +9,7 @@ from pathlib import Path
 
 from brains_bot.config import PROJECT_ROOT, load_env_file
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
-from brains_bot.importers.loader import load_aliases, run_import
+from brains_bot.importers.loader import AUDIO_STATUS_MODES, load_aliases, run_import
 from brains_bot.importers.report import build_report
 
 
@@ -25,6 +25,11 @@ def main(argv: list[str] | None = None) -> int:
         "--aliases", type=Path, default=PROJECT_ROOT / "data" / "name_aliases.json",
         help="private JSON file of salesperson name corrections (default: data/name_aliases.json)",
     )  # fmt: skip
+    parser.add_argument(
+        "--audio-status", choices=AUDIO_STATUS_MODES, default="notes",
+        help="how to read the 'Audio Status' column: 'notes' (default; it currently holds site "
+        "notes) or 'status' (it holds real audio information). Add --force to re-import a file.",
+    )  # fmt: skip
     args = parser.parse_args(argv)
 
     load_env_file()
@@ -39,7 +44,11 @@ def main(argv: list[str] | None = None) -> int:
     factory = make_session_factory(make_engine(database_url))
     with session_scope(factory) as session:
         stats, result, workbook = run_import(
-            session, args.workbook, force=args.force, aliases=load_aliases(args.aliases)
+            session,
+            args.workbook,
+            force=args.force,
+            aliases=load_aliases(args.aliases),
+            audio_status_mode=args.audio_status,
         )
 
     if stats.skipped_reason:
@@ -55,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {sheet}: {count} records")
     print(f"  Unique projects: {stats.projects} ({len(stats.flagged)} flagged for review)")
     print(f"  Contacts created: {stats.contacts}")
+    print(f"  'Audio Status' read as: {stats.audio_status_mode}")
     print(f"  Report: {report_path}")
     return 0
 
