@@ -121,3 +121,36 @@ def build_workbook(path: Path) -> Path:
     pivot.append(["Row Labels", "Lost", "Won"])
     wb.save(path)
     return path
+
+
+SLIM_HEADERS = [
+    "Sr No.", "Date of Site Visit", "Name of Area", "City", "Name of Potential Site", "Address",
+    "Name of Owners", "Architect", "Contact Person Name", "Phone Number (WhatsApp)", "Column2",
+    "Google Location", "Audio Status", "Column1",
+]  # fmt: skip
+
+
+def build_slim_workbook(path: Path) -> Path:
+    """The slimmed-down export: one 'Data Base' sheet, 'Sr No.' IDs, '+254' phones, and an
+    'Audio Status' column that actually holds site/paint progress notes."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Data Base"
+    ws.append(SLIM_HEADERS)
+    rows = [
+        [1, datetime(2025, 3, 1), "Lavington", "Nairobi", "Kamau proposed villa", "Lavington road",
+         "Mr. Kamau", "TBC", "Mr. Contact", "+254712345678", None, "https://maps.app.goo.gl/x",
+         "Skimming ongoing; client prefers a textured exterior finish.", None],
+        [2, "9/16/2025", "Karen", "Edoret", "Sunrise Apartments", "Karen road", "Sunrise Ltd",
+         "Arch. Example", "Ms. Contact", "+254722111222 or +254733444555", None, None,
+         "Foundation stage.", None],
+        [None, None, None, None, None, None, None, None, None, None, None, None,
+         "Follow-up: meeting with the architect next week.", None],
+        [3, datetime(2025, 4, 2), "Runda", "Nairobi", "Green Court", "Runda road", "TBA", None,
+         "Mr. Site", "TBA", None, None, None, None],
+    ]  # fmt: skip
+    for row in rows:
+        ws.append(row)
+    ws.merge_cells("A3:A4")
+    wb.save(path)
+    return path

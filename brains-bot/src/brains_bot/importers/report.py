@@ -3,10 +3,56 @@ which Git ignores. Phone numbers never appear in it."""
 
 from __future__ import annotations
 
+import re
+
 from brains_bot.importers.loader import ImportStats
 from brains_bot.importers.reconcile import Reconciliation
 from brains_bot.importers.reconcile import __doc__ as POLICY
-from brains_bot.importers.workbook import Workbook
+from brains_bot.importers.workbook import PROJECT_SHEETS, Workbook
+
+# Columns the importer can use. Missing ones simply leave those fields empty.
+USEFUL_COLUMNS = (
+    "ID", "Start time", "Date of Site Visit", "Name of Salesperson",
+    "Name of Area (Location) of Site", "City", "Name of Potential Site", "Address",
+    "Name of Owners", "Contractor", "Architect", "Contact Person Name", "Contact Details",
+    "Name of Company", "Estimated Paint Start Time Line", "Google Location",
+    "Comments (If Any)", "SAR", "Dealer To Route", "Jotun Comments",
+)  # fmt: skip
+AUDIO_WORDS = re.compile(
+    r"audio|sound|speaker|cinema|theat(er|re)|music|hi-?fi|surround|amplifier|av system", re.I
+)
+
+
+def _columns_section(workbook: Workbook) -> list[str]:
+    out = ["## Columns", ""]
+    for sheet in PROJECT_SHEETS:
+        if sheet not in workbook.headers:
+            continue
+        mapping = workbook.headers[sheet]
+        rows = workbook.sheets[sheet]
+        renamed = [
+            f"'{orig}' read as '{canon}'" for canon, orig in mapping.items() if canon != orig
+        ]
+        missing = [c for c in USEFUL_COLUMNS if c not in mapping]
+        empty = [
+            orig
+            for canon, orig in mapping.items()
+            if not any(r.get(canon) not in (None, "") for r in rows)
+        ]
+        out.append(f"### {sheet}")
+        out.append(f"- Renamed: {', '.join(renamed) or 'none'}")
+        out.append(f"- Not in this file (fields left empty): {', '.join(missing) or 'none'}")
+        out.append(f"- Present but empty: {', '.join(empty) or 'none'}")
+        if "Audio Status" in mapping:
+            notes = [r.get("Audio Status") for r in rows if r.get("Audio Status")]
+            audio = sum(1 for t in notes if AUDIO_WORDS.search(str(t)))
+            out.append(
+                f"- 'Audio Status': {len(notes)} filled, {audio} mention audio-related words. "
+                "It is imported as a site note, not as an audio status or evidence of interest "
+                "in audio products."
+            )
+        out.append("")
+    return out
 
 
 def _table(headers: list[str], rows: list[list[object]]) -> list[str]:
@@ -34,7 +80,7 @@ def build_report(
         [
             ["Logical records read (all sheets)", total_records],
             [
-                "Project records (3 project sheets)",
+                "Project records (project sheets)",
                 sum(stats.source_rows[s] for s in project_sheets),
             ],
             ["Unique projects after reconciliation", stats.projects],
@@ -65,6 +111,8 @@ def build_report(
         "sit in rows below the visit (merged cells). Those rows are folded into the visit.",
         "",
     ]
+
+    out += _columns_section(workbook)
 
     out += ["## Reconciliation policy", "", POLICY.strip(), ""]
     methods: dict[str, int] = {}

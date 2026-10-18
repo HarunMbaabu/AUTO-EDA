@@ -75,3 +75,18 @@ def test_shared_first_name_with_different_phones_is_not_merged(workbook):
     # Data Base has "Sunrise Apartments"; similar name but conflicting phone: no merge.
     result = reconcile(sheets)
     assert any(p.source_key.startswith("active:99:") for p in result.projects)
+
+
+def test_slim_export_headers_are_mapped(tmp_path):
+    from tests.workbook_factory import build_slim_workbook
+
+    wb = read_workbook(build_slim_workbook(tmp_path / "slim.xlsx"))
+    rows = wb.sheets["Data Base"]
+    assert [r.source_id for r in rows] == [1, 2, 3]
+    assert rows[0].get("Contact Details") == "+254712345678"
+    assert rows[0].get("Name of Area (Location) of Site") == "Lavington"
+    # The follow-up row folds into record 2, and provenance keeps the original header names.
+    assert rows[1].extra == [("Audio Status", "Follow-up: meeting with the architect next week.")]
+    raw = rows[1].raw()
+    assert "Phone Number (WhatsApp)" in raw and "Contact Details" not in raw
+    assert wb.headers["Data Base"]["ID"] == "Sr No."

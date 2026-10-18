@@ -36,7 +36,9 @@ ROLE_COLUMNS = {
     "contact_person": "Contact Person Name",
 }
 ORGANISATION_ROLES = {"contractor", "company"}
-NOTE_COLUMNS = ("Comments (If Any)", "Jotun Comments")
+# "Audio Status" in the slimmed-down export holds the same site/paint notes as "Comments (If Any)"
+# in the full export; it is imported as a note, never as evidence of interest in audio.
+NOTE_COLUMNS = ("Comments (If Any)", "Audio Status", "Jotun Comments")
 TRACKING_COLUMNS = {
     "site_visited_by_dealer": "Site Visited by Dealer/ODS",
     "quotation_shared": "Quotation Shared",

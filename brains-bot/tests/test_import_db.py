@@ -216,3 +216,27 @@ async def test_project_command_masks_phone(factory, workbook_path, context):
     with session_scope(factory) as s:
         event = s.scalar(select(AuditEvent).where(AuditEvent.action == "project_view"))
         assert event.target == f"project:{kamau_id}" and event.actor_telegram_id == ALLOWED_ID
+
+
+def test_slim_export_import(factory, tmp_path):
+    from tests.workbook_factory import build_slim_workbook
+
+    path = build_slim_workbook(tmp_path / "slim.xlsx")
+    stats, result, workbook = _import(factory, path)
+    with session_scope(factory) as s:
+        assert _count(s, Project) == 3
+        sunrise = _project(s, "db:2")
+        assert sunrise.city == "Eldoret" and sunrise.area == "Karen"
+        # "Audio Status" text is stored as notes, with the column name kept as the field.
+        assert [(nt.field, nt.text) for nt in sunrise.notes] == [
+            ("Audio Status", "Foundation stage."),
+            ("Audio Status", "Follow-up: meeting with the architect next week."),
+        ]
+        person = s.scalar(select(Contact).where(Contact.phone_e164 == "+254712345678"))
+        assert person is not None
+        multi = s.scalar(select(Contact).where(Contact.phone_status == "multiple"))
+        assert multi.phone_candidates == ["+254722111222", "+254733444555"]
+    report = build_report(stats, result, workbook, path.name)
+    assert "'Sr No.' read as 'ID'" in report
+    assert "2 filled, 0 mention audio-related words" in report
+    assert "Present but empty: Column2, Column1" in report
