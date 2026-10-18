@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from brains_bot.services import anthropic_check
 
 
@@ -20,6 +22,7 @@ def test_missing_model_exits_without_calling_api(monkeypatch, capsys):
 
 
 def test_success_with_fake_client(monkeypatch, capsys):
+    pytest.importorskip("anthropic")  # optional extra: uv sync --extra anthropic
     monkeypatch.setattr(anthropic_check, "load_env_file", lambda: None)
     monkeypatch.setenv("CLAUDE_MODEL", "test-model")
     client = SimpleNamespace(messages=FakeMessages())

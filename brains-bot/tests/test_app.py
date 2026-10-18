@@ -12,6 +12,7 @@ def test_build_application_registers_commands(settings):
         if isinstance(handler, CommandHandler)
         for name in handler.commands
     }
-    assert commands == {"start", "help", "myid", "health"}
+    assert commands == {"start", "help", "myid", "health", "projects", "search", "project"}
     assert app.bot_data["settings"] is settings
+    assert app.bot_data["db"] is None  # no DATABASE_URL in the test settings
     assert app.error_handlers

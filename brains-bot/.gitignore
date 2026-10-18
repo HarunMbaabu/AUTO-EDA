@@ -19,3 +19,4 @@ data/processed/
 *.xlsx
 *.xls
 *.csv
+data/name_aliases.json
