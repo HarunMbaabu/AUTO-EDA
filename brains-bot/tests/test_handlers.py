@@ -106,3 +106,13 @@ async def test_project_usage_messages(context):
         context.args = args
         await handler(update, context)
         assert reply_of(update).startswith("Usage:")
+
+
+async def test_polling_network_errors_are_a_warning_not_an_error(context, caplog):
+    from telegram.error import NetworkError
+
+    context.error = NetworkError("Server disconnected")
+    with caplog.at_level(logging.INFO):
+        await handlers.error_handler(None, context)
+    record = next(r for r in caplog.records if getattr(r, "event", "") == "network_retry")
+    assert record.levelname == "WARNING" and record.exc_info is None

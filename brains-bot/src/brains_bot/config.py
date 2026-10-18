@@ -65,6 +65,10 @@ class Settings:
     allowed_user_ids: frozenset[int]
     log_level: str = "INFO"
     database_url: str | None = field(default=None, repr=False)
+    claude_model: str | None = None
+    # Whether an Anthropic key is configured. The key itself stays in the environment, where
+    # the SDK reads it; it is never copied into settings.
+    anthropic_key_present: bool = False
 
     def is_allowed(self, user_id: int | None) -> bool:
         return user_id is not None and user_id in self.allowed_user_ids
@@ -92,4 +96,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         allowed_user_ids=allowed,
         log_level=log_level,
         database_url=database_url,
+        claude_model=env.get("CLAUDE_MODEL", "").strip() or None,
+        anthropic_key_present=bool(env.get("ANTHROPIC_API_KEY", "").strip()),
     )

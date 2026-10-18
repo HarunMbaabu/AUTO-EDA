@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -36,3 +37,32 @@ def make_update(user_id: int | None):
 def reply_of(update) -> str:
     update.effective_message.reply_text.assert_awaited_once()
     return update.effective_message.reply_text.await_args.args[0]
+
+
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+
+
+@pytest.fixture
+def engine():
+    """A wiped PostgreSQL test database. Tests using it are skipped without TEST_DATABASE_URL."""
+    if not TEST_DATABASE_URL:
+        pytest.skip("TEST_DATABASE_URL not set")
+    from sqlalchemy import text
+
+    from brains_bot.database.models import Base
+    from brains_bot.database.session import make_engine
+
+    engine = make_engine(TEST_DATABASE_URL)
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def factory(engine):
+    from brains_bot.database.session import make_session_factory
+
+    return make_session_factory(engine)

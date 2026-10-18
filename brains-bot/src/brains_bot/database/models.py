@@ -198,3 +198,42 @@ class AuditEvent(Base):
     action: Mapped[str] = mapped_column(String(60))
     target: Mapped[str | None] = mapped_column(String(120))
     details: Mapped[dict[str, Any]] = mapped_column(default=dict)
+
+
+class Category(TimestampMixin, Base):
+    """A product category the bot can analyse. Defined in data/categories.json and synced here;
+    adding a category needs no code change."""
+
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(50), unique=True)
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text)
+    best_from: Mapped[int]  # construction stage numbers, see services/stages.py
+    best_to: Mapped[int]
+    retrofit_to: Mapped[int | None]
+    timing_note: Mapped[str] = mapped_column(Text, default="")
+    has_verified_catalog: Mapped[bool] = mapped_column(default=False)
+    active: Mapped[bool] = mapped_column(default=True)
+
+
+class OpportunityAssessment(Base):
+    """A saved Claude analysis. Inputs are referenced, not copied: no names or phone numbers."""
+
+    __tablename__ = "opportunity_assessments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    category_key: Mapped[str] = mapped_column(String(50))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actor_telegram_id: Mapped[int | None] = mapped_column(BigInteger)
+    model: Mapped[str] = mapped_column(String(100))
+    data_batch_id: Mapped[int | None] = mapped_column(ForeignKey("import_batches.id"))
+    stage: Mapped[int | None]
+    timing_status: Mapped[str] = mapped_column(String(30))
+    result: Mapped[dict[str, Any]]
+    input_tokens: Mapped[int | None]
+    output_tokens: Mapped[int | None]

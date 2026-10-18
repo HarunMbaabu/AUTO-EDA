@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import time
 
 from telegram import BotCommand
@@ -13,9 +15,13 @@ from telegram.ext import (
     filters,
 )
 
-from brains_bot.bot import handlers, project_handlers
+from brains_bot.bot import analysis_handlers, handlers, project_handlers
 from brains_bot.config import Settings
-from brains_bot.database.session import make_engine, make_session_factory
+from brains_bot.database.session import make_engine, make_session_factory, session_scope
+from brains_bot.services.analysis import ClaudeAnalyzer, make_client
+from brains_bot.services.categories import sync_categories
+
+log = logging.getLogger(__name__)
 
 # The bot only works in one-to-one chats, so private data never lands in a group.
 PRIVATE_CHAT = filters.ChatType.PRIVATE
@@ -26,6 +32,26 @@ async def _post_init(application: Application) -> None:
     await application.bot.set_my_commands(
         [BotCommand(name, desc) for name, desc in handlers.PUBLIC_COMMANDS.items()]
     )
+    factory = application.bot_data.get("db")
+    if factory is not None:
+        # Keep the category table in step with data/categories.json.
+        def sync() -> int:
+            with session_scope(factory) as session:
+                return sync_categories(session)
+
+        try:
+            count = await asyncio.to_thread(sync)
+            log.info(
+                "categories synced", extra={"event": "categories_synced", "command": str(count)}
+            )
+        except Exception:
+            log.exception("category sync failed", extra={"event": "db_error"})
+
+
+def _make_analyzer(settings: Settings) -> ClaudeAnalyzer | None:
+    if not (settings.anthropic_key_present and settings.claude_model):
+        return None
+    return ClaudeAnalyzer(make_client(), settings.claude_model)
 
 
 def build_application(settings: Settings) -> Application:
@@ -38,6 +64,7 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["db"] = (
         make_session_factory(make_engine(settings.database_url)) if settings.database_url else None
     )
+    application.bot_data["analyzer"] = _make_analyzer(settings)
 
     commands = {
         "start": handlers.start,
@@ -47,6 +74,8 @@ def build_application(settings: Settings) -> Application:
         "projects": project_handlers.projects,
         "search": project_handlers.search,
         "project": project_handlers.project,
+        "categories": analysis_handlers.categories,
+        "analyze": analysis_handlers.analyze,
     }
     for name, callback in commands.items():
         application.add_handler(CommandHandler(name, callback, filters=PRIVATE_CHAT))

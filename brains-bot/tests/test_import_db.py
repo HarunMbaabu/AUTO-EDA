@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 
 from brains_bot.database.models import (
     AuditEvent,
@@ -24,7 +24,7 @@ from brains_bot.database.models import (
     SalesAssignment,
     SourceRecord,
 )
-from brains_bot.database.session import make_engine, make_session_factory, session_scope
+from brains_bot.database.session import session_scope
 from brains_bot.importers.loader import STALE_REASON, run_import
 from brains_bot.importers.report import build_report
 from brains_bot.services import project_service as svc
@@ -33,22 +33,6 @@ from tests.workbook_factory import build_workbook
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-
-@pytest.fixture
-def engine():
-    engine = make_engine(TEST_DATABASE_URL)
-    with engine.begin() as conn:
-        conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture
-def factory(engine):
-    return make_session_factory(engine)
 
 
 @pytest.fixture

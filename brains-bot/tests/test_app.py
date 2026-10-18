@@ -12,7 +12,10 @@ def test_build_application_registers_commands(settings):
         if isinstance(handler, CommandHandler)
         for name in handler.commands
     }
-    assert commands == {"start", "help", "myid", "health", "projects", "search", "project"}
+    assert commands == {
+        "start", "help", "myid", "health", "projects", "search", "project", "categories", "analyze",
+    }  # fmt: skip
     assert app.bot_data["settings"] is settings
     assert app.bot_data["db"] is None  # no DATABASE_URL in the test settings
+    assert app.bot_data["analyzer"] is None  # no ANTHROPIC_API_KEY or CLAUDE_MODEL
     assert app.error_handlers
