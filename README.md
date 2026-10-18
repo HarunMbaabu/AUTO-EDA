@@ -119,7 +119,7 @@ Projects that disappear from a newer workbook are flagged, not deleted.
 ## AI analysis (`/analyze`)
 
 The operator chose **DeepSeek** as the provider (a change from the original spec, which named
-Claude). Set `DEEPSEEK_API_KEY` (and optionally `DEEPSEEK_MODEL`, default `deepseek-chat`).
+Claude). Set `DEEPSEEK_API_KEY` (and optionally `DEEPSEEK_MODEL`, default `deepseek-v4-pro`; `deepseek-flash` is the lighter option. `brains-bot-check-ai` lists the models your account can use).
 Claude remains available as an alternative: if no DeepSeek key is set, `ANTHROPIC_API_KEY` and
 `CLAUDE_MODEL` are used. With neither, the bot runs normally and `/analyze` says it is not
 configured. Check the connection (no tokens used for DeepSeek) with:
