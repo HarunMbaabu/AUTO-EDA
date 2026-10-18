@@ -29,6 +29,7 @@ PRIVATE_COMMANDS = {
     "project": "Show one project, e.g. /project 12",
     "categories": "Product categories and their best timing",
     "analyze": "Claude analysis for a project and category, e.g. /analyze 12 audio",
+    "import": "How to load or update the data: send the workbook (.xlsx) as a file",
 }
 
 NOT_AUTHORIZED = (

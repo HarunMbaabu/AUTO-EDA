@@ -15,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-from brains_bot.bot import analysis_handlers, handlers, project_handlers
+from brains_bot.bot import analysis_handlers, handlers, import_handlers, project_handlers
 from brains_bot.config import Settings
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
 from brains_bot.services.analysis import ClaudeAnalyzer, make_client
@@ -82,6 +82,7 @@ def build_application(settings: Settings) -> Application:
         "categories": analysis_handlers.categories,
         "analyze": analysis_handlers.analyze,
         "analyse": analysis_handlers.analyze,  # British spelling
+        "import": import_handlers.import_help,
     }
     for name, callback in commands.items():
         application.add_handler(CommandHandler(name, callback, filters=PRIVATE_CHAT))
@@ -95,6 +96,9 @@ def build_application(settings: Settings) -> Application:
     )
     application.add_handler(
         MessageHandler(PRIVATE_CHAT & filters.TEXT & ~filters.COMMAND, handlers.text_message)
+    )
+    application.add_handler(
+        MessageHandler(PRIVATE_CHAT & filters.Document.ALL, import_handlers.workbook_upload)
     )
     application.add_error_handler(handlers.error_handler)
     return application

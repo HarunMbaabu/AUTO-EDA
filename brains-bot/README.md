@@ -19,6 +19,10 @@ reviews and sends.
 | `/project <number>`| Authorized     | One project: location, audio status, people, latest notes, review flags and source rows |
 | `/categories`      | Authorized     | Product categories and the construction stages when each is best pitched |
 | `/analyze <number> <category> [refresh]` | Authorized | AI assessment: fit, timing, recorded facts, inferred needs, unknowns, next step |
+| `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
+
+An uploaded workbook is saved only to a temporary folder for the import and deleted right after;
+the import is the same as `brains-bot-import` (max 20 MB, Telegram's limit for bots).
 
 Contact phone numbers are shown masked (`+254 7XX XXX 678`) together with the marketing consent
 status, which the import always sets to **unknown**. Estimated paint start dates are labelled as
@@ -88,17 +92,10 @@ The bot uses long polling, so no public URL is needed. Stop it with Ctrl+C; it s
    `MISTRAL_API_KEY`.
 3. Stop every other copy of the bot first (dev machine, cloud session). Telegram allows one
    long-polling connection per token; two copies make both fail with "Conflict" errors.
-4. Import the workbook once (the worker has no disk for private files). In the database's
-   **Access Control**, allow your own IP address, copy the **External Database URL**, then on
-   a machine with this project and the workbook:
-
-   ```bash
-   DATABASE_URL="<external database url>" uv run alembic upgrade head
-   DATABASE_URL="<external database url>" uv run brains-bot-import "data/raw/<workbook>.xlsx"
-   ```
-
-   Remove your IP from Access Control afterwards. Re-run the import the same way when a newer
-   workbook arrives.
+4. Load the data: send the workbook to the bot in Telegram as a file (see `/import`). Do the
+   same whenever a newer workbook arrives. Alternatively, allow your IP in the database's
+   **Access Control** and run `brains-bot-import` from your own machine with
+   `DATABASE_URL` set to the **External Database URL**.
 
 Logs are in the worker's **Logs** tab. Pushing to the connected branch redeploys
 automatically.
