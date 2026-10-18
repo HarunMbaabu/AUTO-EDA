@@ -17,6 +17,7 @@ from brains_bot.bot.handlers import _user_id, restricted
 from brains_bot.bot.project_handlers import _guard_db, _with_session
 from brains_bot.config import PROJECT_ROOT
 from brains_bot.importers.loader import ImportStats, load_aliases, run_import
+from brains_bot.services import catalog
 from brains_bot.services import project_service as svc
 
 log = logging.getLogger(__name__)
@@ -27,13 +28,26 @@ UNSAFE_NAME_CHARS = re.compile(r"[^A-Za-z0-9 ._()-]")
 
 HOW_TO = (
     "To load or update the project data, send the workbook (.xlsx) to me here as a file.\n"
-    "Sending the same file again does nothing; to re-import it anyway, add the caption: force"
+    "Sending the same file again does nothing; to re-import it anyway, add the caption: force\n\n"
+    "To load or update the product catalog, send the catalog file (.xlsx with a 'Catalog' "
+    "sheet). It replaces the previous catalog."
 )
 
 
 @restricted("import")
 async def import_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(HOW_TO)
+
+
+def _catalog_summary(stats: catalog.CatalogStats) -> str:
+    lines = [f"Catalog loaded: {stats.products} products."]
+    lines += [f"- {key}: {count}" for key, count in sorted(stats.by_category.items())]
+    if stats.unpriced:
+        lines.append(f"- Without a price (shown as 'to be scoped'): {stats.unpriced}")
+    if stats.deactivated:
+        lines.append(f"- No longer in the catalog (hidden): {stats.deactivated}")
+    lines.append("/analyze and chat now suggest these products where they fit a project's stage.")
+    return "\n".join(lines)
 
 
 def _summary(stats: ImportStats) -> str:
@@ -82,34 +96,38 @@ async def workbook_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 await status.edit_text("I couldn't download that file from Telegram. Try again.")
                 return
 
-            def work(session: Session) -> ImportStats:
-                stats, _, _ = run_import(session, path, force=force, aliases=load_aliases(ALIASES))
-                if not stats.skipped_reason:
+            def work(session: Session) -> str:
+                if catalog.is_catalog_file(path):
+                    loaded = catalog.load_catalog(session, path)
                     svc.record_audit(
-                        session, actor, "workbook_import", batch=stats.batch_id, force=force
+                        session, actor, "catalog_import", products=loaded.products, file=path.name
                     )
-                return stats
+                    return _catalog_summary(loaded)
+                stats, _, _ = run_import(session, path, force=force, aliases=load_aliases(ALIASES))
+                if stats.skipped_reason:
+                    return (
+                        f"Nothing to do: {stats.skipped_reason}. Send it again with the caption "
+                        "'force' to re-import it."
+                    )
+                svc.record_audit(
+                    session, actor, "workbook_import", batch=stats.batch_id, force=force
+                )
+                log.info(
+                    "workbook imported",
+                    extra={"event": "workbook_import", "command": str(stats.batch_id)},
+                )
+                return _summary(stats)
 
             try:
-                stats = await _with_session(context, work)
+                reply = await _with_session(context, work)
             except (ValueError, zipfile.BadZipFile) as exc:
                 log.warning(
-                    "workbook rejected (%s)", type(exc).__name__, extra={"event": "import_rejected"}
+                    "file rejected (%s)", type(exc).__name__, extra={"event": "import_rejected"}
                 )
-                await status.edit_text(f"I couldn't import that workbook: {exc}")
+                await status.edit_text(f"I couldn't import that file: {exc}")
                 return
             except Exception:
-                log.exception("workbook import failed", extra={"event": "import_error"})
+                log.exception("import failed", extra={"event": "import_error"})
                 await status.edit_text("The import failed because of an unexpected error.")
                 return
-
-    if stats.skipped_reason:
-        await status.edit_text(
-            f"Nothing to do: {stats.skipped_reason}. Send it again with the caption 'force' "
-            "to re-import it."
-        )
-        return
-    log.info(
-        "workbook imported", extra={"event": "workbook_import", "command": str(stats.batch_id)}
-    )
-    await status.edit_text(_summary(stats))
+    await status.edit_text(reply)

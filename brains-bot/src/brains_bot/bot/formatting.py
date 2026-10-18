@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from brains_bot.importers.normalize import mask_phone
+from brains_bot.services.catalog import needs_retrofit, price_text
 from brains_bot.services.project_service import ContactView, ProjectDetail, ProjectSummary
 
 MAX_MESSAGE = 4000  # Telegram's limit is 4096 characters
@@ -183,9 +184,17 @@ def analysis(ctx, result, note: str) -> str:
         out += ["", "Unknowns"]
         out += [f"- {u}" for u in result.unknowns]
     out += ["", "Suggested next step", result.suggested_next_step]
-    catalog = (
-        "" if category.has_verified_catalog
-        else " No products or prices are suggested until a verified catalog is loaded."
-    )  # fmt: skip
+    if ctx.products:
+        out += ["", "Catalog options that fit this stage"]
+        for p in ctx.products:
+            how = " · retrofit" if needs_retrofit(p, stage.stage) else ""
+            supplier = f" · {p.supplier}" if p.supplier else ""
+            out.append(f"- {p.name}: {price_text(p)}{how}{supplier}")
+    if ctx.products:
+        catalog = " Products and prices are from the verified catalog; confirm before quoting."
+    elif category.has_verified_catalog:
+        catalog = " No catalog product fits this stage."
+    else:
+        catalog = " No products or prices are suggested until a verified catalog is loaded."
     out += ["", f"Based on the imported workbook, not verified current status.{catalog}", note]
     return truncate("\n".join(out), MAX_MESSAGE)

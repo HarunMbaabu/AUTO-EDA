@@ -237,3 +237,27 @@ class OpportunityAssessment(Base):
     result: Mapped[dict[str, Any]]
     input_tokens: Mapped[int | None]
     output_tokens: Mapped[int | None]
+
+
+class CatalogProduct(TimestampMixin, Base):
+    """A product or package from the verified catalog. Loading a new catalog file replaces the
+    old one: products missing from it are deactivated, not deleted."""
+
+    __tablename__ = "catalog_products"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sku: Mapped[str] = mapped_column(String(80), unique=True)
+    category_key: Mapped[str] = mapped_column(String(50), index=True)
+    name: Mapped[str] = mapped_column(Text)
+    brand: Mapped[str | None] = mapped_column(String(120))
+    supplier: Mapped[str | None] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text, default="")
+    price_kes: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    price_unit: Mapped[str | None] = mapped_column(String(60))
+    install_stage: Mapped[str] = mapped_column(String(20))  # see services/catalog.py
+    retrofit_ok: Mapped[bool] = mapped_column(default=False)
+    available: Mapped[str | None] = mapped_column(String(60))
+    price_checked: Mapped[date | None] = mapped_column(Date)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    source_file: Mapped[str | None] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(default=True)

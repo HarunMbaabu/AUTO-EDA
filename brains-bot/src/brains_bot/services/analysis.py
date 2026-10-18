@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Literal
 
@@ -30,6 +30,7 @@ from brains_bot.database.models import (
     SourceRecord,
 )
 from brains_bot.logging_setup import redact
+from brains_bot.services import catalog
 from brains_bot.services.stages import (
     CategoryWindow,
     StageResult,
@@ -69,8 +70,10 @@ those facts (possible_needs), and what is not known (unknowns).
 - Only list a recorded fact if it appears in the data, and name where it came from (for \
 example "note dated 2025-09-25" or "site visit record").
 - Never invent a budget, a customer preference, a completion date, a discount, a product, a \
-specification, a price or a showroom detail. No verified product catalog is available yet, \
-so do not name products or prices.
+specification, a price or a showroom detail. The only products and prices you may mention are \
+those in catalog_options, by their exact name and listed price, and only as options to \
+discuss, never as what the client wants. catalog_options already lists only products that \
+still fit the recorded stage. If it is absent or empty, name no products or prices.
 - A note about painting or construction does not mean the client wants this category. Say \
 that interest is unknown unless the data says otherwise.
 - The construction stage and timing were computed by the system and are given to you. Use \
@@ -160,6 +163,7 @@ class AnalysisContext:
     timing: Timing
     payload: dict[str, Any]  # exactly what is sent to Claude
     data_batch_id: int | None
+    products: list[Any] = field(default_factory=list)  # catalog products that fit the stage
 
 
 _SPACED_PHONE = re.compile(r"(?<!\d)(?:\+?254|0)\s?[17](?:[\s-]?\d){8}(?!\d)")
@@ -253,7 +257,14 @@ def build_context(
         ],
         "audio_status": scrub(project.audio_status, names) if project.audio_status else None,
     }
-    return AnalysisContext(project.id, category, stage, timing, payload, batch_id)
+    products = (
+        catalog.suggestions(session, category.key, stage.stage)
+        if category.has_verified_catalog
+        else []
+    )
+    if products:
+        payload["catalog_options"] = [catalog.product_summary(p, stage.stage) for p in products]
+    return AnalysisContext(project.id, category, stage, timing, payload, batch_id, products)
 
 
 def _user_message(ctx: AnalysisContext) -> str:
