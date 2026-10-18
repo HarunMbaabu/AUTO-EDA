@@ -4,7 +4,7 @@ A human-in-the-loop sales intelligence assistant for authorized sales operators,
 private Telegram bot. It never sends messages to customers on its own: it prepares, a human
 reviews and sends.
 
-**Current status: Phase 3 (Claude analysis).** Product catalogs (Phase 4) are not built yet.
+**Current status: Phase 3 (AI analysis, using DeepSeek).** Product catalogs (Phase 4) are not built yet.
 
 ## Commands
 
@@ -18,7 +18,7 @@ reviews and sends.
 | `/search <text>`   | Authorized     | Searches site names, areas, cities, addresses and names of people/companies (not phone numbers) |
 | `/project <number>`| Authorized     | One project: location, audio status, people, latest notes, review flags and source rows |
 | `/categories`      | Authorized     | Product categories and the construction stages when each is best pitched |
-| `/analyze <number> <category> [refresh]` | Authorized | Claude assessment: fit, timing, recorded facts, inferred needs, unknowns, next step |
+| `/analyze <number> <category> [refresh]` | Authorized | AI assessment: fit, timing, recorded facts, inferred needs, unknowns, next step |
 
 Contact phone numbers are shown masked (`+254 7XX XXX 678`) together with the marketing consent
 status, which the import always sets to **unknown**. Estimated paint start dates are labelled as
@@ -116,15 +116,23 @@ otherwise those fields stay empty.
 Re-running with the same file does nothing; `--force` re-imports without creating duplicates.
 Projects that disappear from a newer workbook are flagged, not deleted.
 
-## Claude analysis (`/analyze`)
+## AI analysis (`/analyze`)
 
-Set `ANTHROPIC_API_KEY` and `CLAUDE_MODEL` (e.g. `claude-opus-5-5`) in `.env` or the
-environment. Without them the bot runs normally and `/analyze` says it is not configured.
-Check the connection with:
+The operator chose **DeepSeek** as the provider (a change from the original spec, which named
+Claude). Set `DEEPSEEK_API_KEY` (and optionally `DEEPSEEK_MODEL`, default `deepseek-chat`).
+Claude remains available as an alternative: if no DeepSeek key is set, `ANTHROPIC_API_KEY` and
+`CLAUDE_MODEL` are used. With neither, the bot runs normally and `/analyze` says it is not
+configured. Check the connection (no tokens used for DeepSeek) with:
 
 ```bash
-uv run brains-bot-check-anthropic
+uv run brains-bot-check-ai
 ```
+
+In a cloud environment with limited network access, allow `api.deepseek.com`.
+
+**Data protection:** analysis requests go to the chosen provider's servers (DeepSeek's are
+outside Kenya). Only the scrubbed context described below is sent, but confirm the
+cross-border transfer is acceptable under the Kenya Data Protection Act before real use.
 
 How an analysis works:
 
@@ -137,14 +145,15 @@ How an analysis works:
    construction stage mentioned in the site notes (with the sentence it came from and the
    note date) against the category's window. Stages older than 120 days are flagged as
    possibly out of date.
-3. **Claude receives the minimum**: project number, area, city, dates, stage, timing and the
+3. **The AI receives the minimum**: project number, area, city, dates, stage, timing and the
    site notes with phone numbers, emails, titled names (`Mr. X`) and the project's recorded
    owner/contact/architect names replaced. Site names, contact names and phone numbers are
    never sent. Notes are passed as quoted data and the instructions say to ignore any
    instructions inside them.
-4. **The answer has a fixed structure** (validated; one retry if it is malformed): fit,
+4. **The answer has a fixed structure** (validated against a schema; one retry if it is
+   malformed; Claude enforces the schema server-side, DeepSeek uses JSON mode): fit,
    summary, recorded facts with their source, possible needs marked as inferred with a
-   confidence, unknowns, a timing comment and a suggested next step. Claude is told never to
+   confidence, unknowns, a timing comment and a suggested next step. The model is told never to
    invent budgets, preferences, products or prices; no product is named until a verified
    catalog exists (Phase 4).
 5. **Results are saved** in `opportunity_assessments` with the model and token counts, and
@@ -202,7 +211,9 @@ src/brains_bot/
     ├── project_service.py   # project queries and audit log
     ├── stages.py            # construction stage detection and category timing
     ├── categories.py        # category sync and lookup
-    ├── analysis.py          # Claude context, prompt, structured output, saving
+    ├── analysis.py          # AI context, prompt, answer schema, Claude analyzer, saving
+    ├── deepseek.py          # DeepSeek analyzer (same context and schema)
+    ├── ai_check.py          # brains-bot-check-ai
     └── anthropic_check.py   # Claude connectivity check
 migrations/                  # Alembic migrations
 tests/
@@ -212,8 +223,8 @@ tests/
 
 1. **Secure Telegram bot.** Done.
 2. **Workbook profiling, cleaning and PostgreSQL import; `/projects`, `/search`, `/project`.** Done.
-3. **Claude analysis (`/analyze`, `/categories`) with facts kept separate from inferences.** Built;
-   tested with simulated Claude responses, awaiting a live check with an API key.
+3. **AI analysis (`/analyze`, `/categories`) with facts kept separate from inferences.** Built;
+   tested with simulated DeepSeek and Claude responses, awaiting a live check.
 4. Verified product catalogs and grounded recommendations.
 5. Reviewable outreach drafts with prefilled WhatsApp/SMS links (manual send only).
 6. Opportunity ranking, follow-ups and deployment.

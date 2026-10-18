@@ -20,8 +20,8 @@ from brains_bot.services.categories import active_categories, resolve_category
 log = logging.getLogger(__name__)
 
 NOT_CONFIGURED = (
-    "Claude analysis is not configured yet. The administrator needs to set ANTHROPIC_API_KEY "
-    "and CLAUDE_MODEL."
+    "AI analysis is not configured yet. The administrator needs to set DEEPSEEK_API_KEY "
+    "(or ANTHROPIC_API_KEY and CLAUDE_MODEL)."
 )
 
 
@@ -53,7 +53,7 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "Example: /analyze 205 audio\nSee /categories for the list."
         )
         return
-    analyzer: an.ClaudeAnalyzer | None = context.bot_data.get("analyzer")
+    analyzer = context.bot_data.get("analyzer")
     if analyzer is None:
         await update.effective_message.reply_text(NOT_CONFIGURED)
         return
@@ -122,7 +122,7 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await status.edit_text(formatting.analysis(ctx, result, note))
 
 
-async def _run_in_thread(analyzer: an.ClaudeAnalyzer, ctx: an.AnalysisContext):
+async def _run_in_thread(analyzer, ctx: an.AnalysisContext):
     import asyncio
 
     return await asyncio.to_thread(analyzer.analyze, ctx)

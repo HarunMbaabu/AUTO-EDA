@@ -68,6 +68,7 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "anthropic" },
+    { name = "httpx" },
     { name = "openpyxl" },
     { name = "psycopg", extra = ["binary"] },
     { name = "python-dotenv" },
@@ -86,6 +87,7 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.20.0" },
     { name = "anthropic", specifier = ">=1.15.0" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "python-dotenv", specifier = ">=1.2.4" },

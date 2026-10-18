@@ -322,7 +322,7 @@ class ClaudeAnalyzer:
             log.info(
                 "claude call",
                 extra={
-                    "event": "claude_call",
+                    "event": "ai_call",
                     "model": getattr(response, "model", self.model),
                     "stop_reason": response.stop_reason,
                     "input_tokens": getattr(usage, "input_tokens", None),
