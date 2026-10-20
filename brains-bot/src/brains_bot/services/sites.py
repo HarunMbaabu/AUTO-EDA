@@ -51,7 +51,7 @@ A sales person in Kenya pasted a WhatsApp report about building sites they visit
 JSON with "context" (any intro text) and "items" (one entry per site). Reply with one JSON \
 object {{"visit_date": ..., "sites": [...]}} where "sites" holds exactly {count} objects, \
 one per item, in the same order, each with exactly these keys:
-- "site_name": the name the item starts with or states (e.g. "Dennis project", "Pesh Villa"); \
+- "site_name": the name the item starts with or states (e.g. "Daudi project", "Jane Villa"); \
 if the item starts with only a person's name, "<that name> project"; never invent names
 - "area": the estate, road or neighbourhood stated in the item (e.g. "Riverview 79"), or null
 - "city": the town if stated or obvious from a well-known area (e.g. Runda -> Nairobi), or null
@@ -63,7 +63,7 @@ if the item starts with only a person's name, "<that name> project"; never inven
 - "kind": "contact" if the item records a person or company for future work with no specific \
 building project (e.g. "met a contractor, good contact for future projects"); otherwise "site"
 - "trade": the person's trade, one of {trades}, or null
-- "company": the company they work for if named (e.g. "Florissant Construction"), or null
+- "company": the company they work for if named (e.g. "Example Construction"), or null
 Also add a top-level key "visit_date": the date the visits happened if the report states one \
 (e.g. "20/10/2026", "13th Oct", "yesterday", "on Monday"), as YYYY-MM-DD, else null. Today is \
 {today}; Kenyan dates are written day first.
@@ -337,7 +337,7 @@ def match_existing(session: Session, drafts: list[SiteDraft]) -> None:
 
 
 def _site_name(site_name: str | None, contact_name: str | None) -> str | None:
-    """'George Contractor project' -> 'George project'."""
+    """'Gitau Contractor project' -> 'Gitau project'."""
     trimmed = _without_trade(contact_name)
     if site_name and contact_name and trimmed != contact_name and contact_name in site_name:
         return site_name.replace(contact_name, trimmed)
@@ -478,7 +478,7 @@ def _same_person_without_a_number(
 
 
 def number_problems(phone: n.PhoneResult) -> list[str]:
-    """'07248002338 has 11 digits' for each number in the report that is not a usable one."""
+    """'07900022338 has 11 digits' for each number in the report that is not a usable one."""
     problems = []
     for part in phone.invalid_parts:
         digits = re.sub(r"\D", "", part)
@@ -492,7 +492,7 @@ _TRADE_WORDS = {"contractor", "contractors", "interior", "designer", "architect"
 
 
 def _without_trade(name: str | None) -> str | None:
-    """'George Contractor' -> 'George', 'Ken interior designer' -> 'Ken': the trade is kept in
+    """'Gitau Contractor' -> 'Gitau', 'Kip interior designer' -> 'Kip': the trade is kept in
     its own field."""
     if not name:
         return name

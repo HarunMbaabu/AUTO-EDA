@@ -18,26 +18,26 @@ from tests.test_import_db import _import
 from tests.workbook_factory import build_slim_workbook
 
 REPORT = (
-    "This a project at Runda mumwe Riaka they have finished on the building phase and we "
-    "mostly can get in on the house finishing areas the contractor is Maina 0721462244."
-    "https://maps.app.goo.gl/TkJW4TT1D9PAmb856?g_st=ac"
+    "This a project at Runda Example Court they have finished on the building phase and we "
+    "mostly can get in on the house finishing areas the contractor is Mutua 0790003244."
+    "https://maps.app.goo.gl/ExampleMapLink01?g_st=ac"
 )
-ANSWER = {"site_name": "Runda Mumwe Riaka project", "area": "Runda Mumwe Riaka",
-          "city": "Nairobi", "contact_name": "Maina", "contact_role": "contractor"}  # fmt: skip
+ANSWER = {"site_name": "Runda Example Court project", "area": "Runda Example Court",
+          "city": "Nairobi", "contact_name": "Mutua", "contact_role": "contractor"}  # fmt: skip
 
 
 def test_extract_keeps_contact_details_local():
     transport = FakeTransport(text(json.dumps(ANSWER)))
     (draft,) = sites.extract(transport, REPORT)
     sent = transport.requests[0]["messages"][1]["content"]
-    assert "0721462244" not in sent and "maps.app" not in sent
-    assert "Maina [phone].[map link]" in sent
+    assert "0790003244" not in sent and "maps.app" not in sent
+    assert "Mutua [phone].[map link]" in sent
     assert transport.requests[0]["response_format"] == {"type": "json_object"}
-    assert draft.phone.e164 == "+254721462244"
-    assert draft.map_url == "https://maps.app.goo.gl/TkJW4TT1D9PAmb856?g_st=ac"
+    assert draft.phone.e164 == "+254790003244"
+    assert draft.map_url == "https://maps.app.goo.gl/ExampleMapLink01?g_st=ac"
     assert (draft.site_name, draft.area, draft.city) == (
-        "Runda Mumwe Riaka project", "Runda Mumwe Riaka", "Nairobi")  # fmt: skip
-    assert (draft.contact_name, draft.contact_role) == ("Maina", "contractor")
+        "Runda Example Court project", "Runda Example Court", "Nairobi")  # fmt: skip
+    assert (draft.contact_name, draft.contact_role) == ("Mutua", "contractor")
 
 
 def test_extract_falls_back_when_the_ai_says_little():
@@ -64,7 +64,7 @@ def test_save_creates_a_project_the_rest_of_the_bot_can_use(factory, tmp_path):
         )
         assert roles == ["contact_person"]
         contact = pick_contact(s, project.id)
-        assert contact.name == "Maina" and contact.phone_e164 == "+254721462244"
+        assert contact.name == "Mutua" and contact.phone_e164 == "+254790003244"
         project_id = project.id
 
     # A later workbook upload does not flag it as "missing from the latest import".
@@ -89,8 +89,8 @@ async def test_newsite_preview_then_save(factory, context):
     update, status = _update(ALLOWED_ID, "/newsite " + REPORT)
     await site_handlers.newsite(update, context)
     preview = status.edit_text.await_args.args[0]
-    assert "NEW: Runda Mumwe Riaka project · Runda Mumwe Riaka, Nairobi" in preview
-    assert "Maina (contractor) · +254 7XX XXX 244 · map" in preview and "0721462244" not in preview
+    assert "NEW: Runda Example Court project · Runda Example Court, Nairobi" in preview
+    assert "Mutua (contractor) · +254 7XX XXX 244 · map" in preview and "0790003244" not in preview
     save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
 
     query = SimpleNamespace(
@@ -138,23 +138,23 @@ async def test_newsite_denied_for_strangers(context):
 
 MULTI = """Good morning team today i will do my follow-up in Riverview, Golden palm.
 
-1. Hilum muraya 0757319583 - Its a site at Riverview preparing to finish on skimming.Hilum is the paint contractor.
-2. Dennis project 0708831086- Its a new project at Riverview 79.He is the care taker the house is skimmed in the interior.I will be meeting the Engineer.
-3. Ken Villa 0723255362...Its a follow up project at Golden palm. We were to supply on the exterior.
+1. Halima Njeri 0790005583 - Its a site at Riverview preparing to finish on skimming.Halima is the paint contractor.
+2. Daudi project 0790006086- Its a new project at Riverview 79.He is the care taker the house is skimmed in the interior.I will be meeting the Engineer.
+3. Kip Villa 0790009362...Its a follow up project at Golden palm. We were to supply on the exterior.
 """  # noqa: E501
 MULTI_ANSWER = {"sites": [
-    {"site_name": "Hilum muraya project", "area": "Riverview", "contact_name": "Hilum muraya",
+    {"site_name": "Halima Njeri project", "area": "Riverview", "contact_name": "Halima Njeri",
      "contact_role": "contractor", "role_description": "paint contractor"},
-    {"site_name": "Dennis project", "area": "Riverview 79", "contact_name": "Dennis",
+    {"site_name": "Daudi project", "area": "Riverview 79", "contact_name": "Daudi",
      "contact_role": "contact_person", "role_description": "caretaker"},
-    {"site_name": "Ken Villa", "area": "Golden palm", "contact_role": "owner"},
+    {"site_name": "Kip Villa", "area": "Golden palm", "contact_role": "owner"},
 ]}  # fmt: skip
 
 
 def test_split_report():
     intro, items = sites.split_report(MULTI)
     assert intro.startswith("Good morning team") and len(items) == 3
-    assert items[0].startswith("Hilum muraya 0757319583") and items[2].startswith("Ken Villa")
+    assert items[0].startswith("Halima Njeri 0790005583") and items[2].startswith("Kip Villa")
     assert sites.split_report("One site only, no list") == ("", ["One site only, no list"])
 
 
@@ -164,7 +164,7 @@ def test_a_numbered_list_becomes_several_sites_and_follow_ups_match_by_phone(fac
     payload = json.loads(transport.requests[0]["messages"][1]["content"])
     assert len(payload["items"]) == 3 and "Riverview" in payload["context"]
     assert not any(ch.isdigit() for item in payload["items"] for ch in item.replace("79", ""))
-    assert [d.phone.e164 for d in drafts] == ["+254757319583", "+254708831086", "+254723255362"]
+    assert [d.phone.e164 for d in drafts] == ["+254790005583", "+254790006086", "+254790009362"]
     assert drafts[1].role_description == "caretaker"
     assert drafts[0].message.endswith("paint contractor.")  # each site keeps only its own text
 
@@ -172,7 +172,7 @@ def test_a_numbered_list_becomes_several_sites_and_follow_ups_match_by_phone(fac
         sites.match_existing(s, drafts)
         assert all(d.existing_project_id is None for d in drafts)
         ken = sites.save(s, drafts[2], date(2026, 10, 1))
-        assert ken.kind == "new_site"  # Ken Villa saved earlier
+        assert ken.kind == "new_site"  # Kip Villa saved earlier
 
     later = sites.extract(FakeTransport(text(json.dumps(MULTI_ANSWER))), MULTI)
     with session_scope(factory) as s:
@@ -180,12 +180,12 @@ def test_a_numbered_list_becomes_several_sites_and_follow_ups_match_by_phone(fac
         assert later[2].existing_project_id == ken.id and later[0].existing_project_id is None
         for draft in later:
             sites.save(s, draft, date(2026, 10, 20))
-        assert len(s.scalars(select(Project)).all()) == 3  # no duplicate Ken Villa
+        assert len(s.scalars(select(Project)).all()) == 3  # no duplicate Kip Villa
         notes = s.scalars(select(ProjectNote).where(ProjectNote.project_id == ken.id)).all()
         assert len(notes) == 2 and notes[-1].observed_date == date(2026, 10, 20)
-        dennis = s.scalar(select(Project).where(Project.name == "Dennis project"))
+        dennis = s.scalar(select(Project).where(Project.name == "Daudi project"))
         note = s.scalar(select(ProjectNote.text).where(ProjectNote.project_id == dennis.id))
-        assert note.endswith("(Contact: Dennis, caretaker)")
+        assert note.endswith("(Contact: Daudi, caretaker)")
 
 
 async def test_multi_site_preview_and_save_all(factory, context):
@@ -196,7 +196,7 @@ async def test_multi_site_preview_and_save_all(factory, context):
     await site_handlers.newsite(update, context)
     preview = status.edit_text.await_args.args[0]
     assert preview.startswith("3 sites: please check")
-    assert "2. NEW: Dennis project · Riverview 79" in preview and "Dennis (caretaker)" in preview
+    assert "2. NEW: Daudi project · Riverview 79" in preview and "Daudi (caretaker)" in preview
     save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
     assert save.text == "✅ Save all 3"
     query = SimpleNamespace(
@@ -211,7 +211,7 @@ async def test_multi_site_preview_and_save_all(factory, context):
 def test_list_split_survives_lost_line_breaks_and_ignores_other_numbers():
     joined = MULTI.replace("\n", " ")
     intro, items = sites.split_report(joined)
-    assert len(items) == 3 and items[1].startswith("Dennis project 0708831086")
+    assert len(items) == 3 and items[1].startswith("Daudi project 0790006086")
     assert "Riverview 79" in items[1]  # "79." is not a list number
     one = "Site at Riverview 79. 3 floors done, 2 more to go."
     assert sites.split_report(one) == ("", [one])  # numbers out of sequence: not a list
@@ -254,7 +254,7 @@ def test_impossible_or_missing_dates_fall_back_to_today():
      ("04/02/2026", date(2026, 2, 4)), ("4.2.26", date(2026, 2, 4)),
      ("2026-02-04", date(2026, 2, 4)), ("visited on 13th Oct", date(2026, 10, 13)),
      ("visited 25 dec", date(2025, 12, 25)), ("Yesterday I visited", date(2026, 10, 19)),
-     ("On Monday i visited", date(2026, 10, 19)), ("call 0714222776 now", None),
+     ("On Monday i visited", date(2026, 10, 19)), ("call 0790001776 now", None),
      ("Riverview 79. 3 floors", None), ("mid this month", None), ("4th feb 2027", None)],
 )  # fmt: skip
 def test_date_in_text(text, expected):
@@ -264,11 +264,11 @@ def test_date_in_text(text, expected):
 def test_report_date_is_read_by_the_bot_even_when_the_ai_misses_it():
     report = (
         "Called below contacts for projects on 4th feb 2026\n\n"
-        "1.Pesh Interiors 0714222776...... She is the interior designer at Golden palm.\n"
-        "2.Benjamin project 0715936549......After the call today he confirmed they will call."
+        "1.Jane Decor Interiors 0790001776...... She is the interior designer at Golden palm.\n"
+        "2.Bakari project 0790012549......After the call today he confirmed they will call."
     )
-    answer = {"visit_date": None, "sites": [{"site_name": "Pesh Interiors"},
-                                            {"site_name": "Benjamin project"}]}  # fmt: skip
+    answer = {"visit_date": None, "sites": [{"site_name": "Jane Decor Interiors"},
+                                            {"site_name": "Bakari project"}]}  # fmt: skip
     drafts = sites.extract(FakeTransport(text(json.dumps(answer))), report, date(2026, 10, 20))
     # "today" inside site 2's own text does not override the report's date.
     assert [d.visit_date for d in drafts] == [date(2026, 2, 4), date(2026, 2, 4)]

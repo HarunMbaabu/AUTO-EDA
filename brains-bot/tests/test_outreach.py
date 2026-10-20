@@ -19,7 +19,7 @@ from tests.workbook_factory import build_slim_workbook
 
 def test_first_name():
     assert outreach.first_name("Mr. Richard & Madam Dorcas Anita") == "Mr. Richard"
-    assert outreach.first_name("Madam Rhoda") == "Madam Rhoda"
+    assert outreach.first_name("Madam Rehema") == "Madam Rehema"
     assert outreach.first_name("mr.kamau") == "Mr. kamau"
     assert outreach.first_name("Jane Wanjiru") == "Jane"
     assert outreach.first_name("TBC") is None and outreach.first_name(None) is None

@@ -22,10 +22,10 @@ from tests.test_import_db import _import
 from tests.test_sites import _update
 from tests.workbook_factory import build_slim_workbook
 
-FIRST = "Betty's house in Migaa, walling stage. Betty 0715849912"
-AGAIN = "27th Feb 2026 follow up: Betty from Migaa, roofing now. 0707357098"
-BETTY = {"site_name": "Betty project", "area": "Migaa", "city": "Kiambu",
-         "contact_name": "Betty", "contact_role": "owner"}  # fmt: skip
+FIRST = "Wanza's house in Migaa, walling stage. Wanza 0790008912"
+AGAIN = "27th Feb 2026 follow up: Wanza from Migaa, roofing now. 0790007098"
+BETTY = {"site_name": "Wanza project", "area": "Migaa", "city": "Kiambu",
+         "contact_name": "Wanza", "contact_role": "owner"}  # fmt: skip
 
 
 def _drafts(message):
@@ -63,7 +63,7 @@ async def test_a_new_number_with_the_same_name_and_area_is_offered_as_a_follow_u
         betty_id = sites.save(s, _drafts(FIRST)[0], date(2026, 1, 10)).id
 
     preview, saved = await _send(context, AGAIN, "save")
-    assert f"POSSIBLE REPEAT → #{betty_id} Betty project" in preview
+    assert f"POSSIBLE REPEAT → #{betty_id} Wanza project" in preview
     assert "different number · +254 7XX XXX 098" in preview
     assert saved.startswith("Saved: 1 follow-up note(s).")
     assert _count(factory, Project) == 1
@@ -75,10 +75,10 @@ async def test_a_new_number_with_the_same_name_and_area_is_offered_as_a_follow_u
             .join(ProjectContact, ProjectContact.contact_id == Contact.id)
             .where(ProjectContact.project_id == betty_id)
         ).all()
-        assert set(numbers) == {"+254715849912", "+254707357098"}  # both numbers now known
+        assert set(numbers) == {"+254790008912", "+254790007098"}  # both numbers now known
 
     # Next time either number is recognised straight away.
-    (draft,) = _drafts("Betty again, plastering. 0707357098")
+    (draft,) = _drafts("Wanza again, plastering. 0790007098")
     with session_scope(factory) as s:
         sites.match_existing(s, [draft])
     assert draft.existing_project_id == betty_id and draft.possible_project_id is None
@@ -98,7 +98,7 @@ async def test_save_as_new_then_find_and_merge_the_repeat(factory, context):
     update = make_update(ALLOWED_ID)
     await repeat_handlers.repeats_command(update, context)
     listing = reply_of(update)
-    assert "same name 'Betty' in Migaa" in listing and f"/merge {repeat_id} {betty_id}" in listing
+    assert "same name 'Wanza' in Migaa" in listing and f"/merge {repeat_id} {betty_id}" in listing
 
     update = make_update(ALLOWED_ID)
     context.args = [str(repeat_id), str(betty_id)]
@@ -150,35 +150,35 @@ def test_reimport_keeps_telegram_notes_and_skips_merged_workbook_projects(factor
 
 def test_same_name_and_area_needs_both():
     assert repeats.place_words("Migaa estate, Kiambu road") == {"migaa", "kiambu"}
-    assert repeats.first_name("Mr. Jo") is None and repeats.first_name("Betty W") == "betty"
+    assert repeats.first_name("Mr. Jo") is None and repeats.first_name("Wanza W") == "wanza"
 
 
 def test_the_area_is_also_read_from_the_message_when_the_ai_leaves_it_out(factory):
     with session_scope(factory) as s:
         betty_id = sites.save(s, _drafts(FIRST)[0], date(2026, 1, 10)).id
         found = repeats.same_name_and_area(
-            s, "Betty", None, "Betty project", "Betty from Migaa was visited on 27th Feb 2026"
+            s, "Wanza", None, "Wanza project", "Wanza from Migaa was visited on 27th Feb 2026"
         )
-        assert found == (betty_id, "Betty project")
+        assert found == (betty_id, "Wanza project")
         # The name alone (here also in the site name) is not enough.
-        assert repeats.same_name_and_area(s, "Betty", None, "Betty project", "in Ruiru") is None
+        assert repeats.same_name_and_area(s, "Wanza", None, "Wanza project", "in Ruiru") is None
 
 
 KIORA = """3rd March 2026
 Kiora area
 I went to Kiora and i made some follow up and also identified two new.
-1.Bahati project 0705769076... Its a new project in kiora which is partially skimmed.
-2.Kagui Contractor 0722453478.... Its a follow up project, they purchased skimming products.
-3.Ken interior designer 07248002338 project..... He has a stalled project at kiora.
-4.George Contractor 0718593948....He is a contractor at Kiora and its a new project."""
+1.Baraka project 0790013076... Its a new project in kiora which is partially skimmed.
+2.Kiprono Contractor 0790010478.... Its a follow up project, they purchased skimming products.
+3.Kip interior designer 07900022338 project..... He has a stalled project at kiora.
+4.Gitau Contractor 0790011948....He is a contractor at Kiora and its a new project."""
 KIORA_ANSWER = {"sites": [
-    {"site_name": "Bahati project", "area": "Kiora"},
-    {"site_name": "Kagui project", "area": "Kiora", "contact_name": "Kagui Contractor",
+    {"site_name": "Baraka project", "area": "Kiora"},
+    {"site_name": "Kiprono project", "area": "Kiora", "contact_name": "Kiprono Contractor",
      "contact_role": "contractor"},
-    {"site_name": "Ken project", "area": "Kiora", "contact_name": "Ken",
+    {"site_name": "Kip project", "area": "Kiora", "contact_name": "Kip",
      "contact_role": "contact_person", "role_description": "interior designer"},
-    {"site_name": "George Contractor project", "area": "Kiora",
-     "contact_name": "George Contractor", "contact_role": "contractor"},
+    {"site_name": "Gitau Contractor project", "area": "Kiora",
+     "contact_name": "Gitau Contractor", "contact_role": "contractor"},
 ]}  # fmt: skip
 
 
@@ -189,27 +189,27 @@ async def test_a_mistyped_number_is_flagged_kept_and_corrected_by_a_follow_up(fa
     update, status = _update(ALLOWED_ID, "/newsite " + KIORA)
     await site_handlers.newsite(update, context)
     preview = status.edit_text.await_args.args[0]
-    assert "Ken (interior designer) · ⚠ CHECK NUMBER: 07248002338 has 11 digits" in preview
+    assert "Kip (interior designer) · ⚠ CHECK NUMBER: 07900022338 has 11 digits" in preview
     assert "not a valid Kenyan mobile number" in preview
-    assert "4. NEW: George project" in preview and "George (contractor)" in preview
-    assert "Kagui (contractor)" in preview
+    assert "4. NEW: Gitau project" in preview and "Gitau (contractor)" in preview
+    assert "Kiprono (contractor)" in preview
     save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
     tap, _ = _tap(save.callback_data)
     await site_handlers.site_callback(tap, context)
     with session_scope(factory) as s:
-        ken_id = s.scalar(select(Project.id).where(Project.name == "Ken project"))
-        ken = s.scalar(select(Contact).where(Contact.name == "Ken"))
-        assert ken.phone_raw == "07248002338" and ken.phone_status == "invalid"
+        ken_id = s.scalar(select(Project.id).where(Project.name == "Kip project"))
+        ken = s.scalar(select(Contact).where(Contact.name == "Kip"))
+        assert ken.phone_raw == "07900022338" and ken.phone_status == "invalid"
 
-    # The right number, sent later as a follow-up, goes on Ken's entry.
-    fix = {"site_name": "Ken project", "area": "Kiora", "contact_name": "Ken"}
+    # The right number, sent later as a follow-up, goes on Kip's entry.
+    fix = {"site_name": "Kip project", "area": "Kiora", "contact_name": "Kip"}
     context.bot_data["drafter"] = Drafter(FakeTransport(text(json.dumps(fix))))
-    update, status = _update(ALLOWED_ID, "/newsite Ken in Kiora, correct number 0724800233")
+    update, status = _update(ALLOWED_ID, "/newsite Kip in Kiora, correct number 0790002233")
     await site_handlers.newsite(update, context)
-    assert f"POSSIBLE REPEAT → #{ken_id} Ken project" in status.edit_text.await_args.args[0]
+    assert f"POSSIBLE REPEAT → #{ken_id} Kip project" in status.edit_text.await_args.args[0]
     save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
     tap, _ = _tap(save.callback_data)
     await site_handlers.site_callback(tap, context)
     with session_scope(factory) as s:
-        kens = s.scalars(select(Contact).where(Contact.name == "Ken")).all()
-        assert [(k.phone_e164, k.phone_status) for k in kens] == [("+254724800233", "valid")]
+        kens = s.scalars(select(Contact).where(Contact.name == "Kip")).all()
+        assert [(k.phone_e164, k.phone_status) for k in kens] == [("+254790002233", "valid")]

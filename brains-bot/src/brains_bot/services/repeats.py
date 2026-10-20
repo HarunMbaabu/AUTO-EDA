@@ -52,7 +52,7 @@ def same_name_and_area(
 ) -> tuple[int, str] | None:
     """The latest project whose contact or owner has this first name, in the same area. The
     places are the new entry's area, site name and message: the AI does not always fill in
-    the area ("Betty from Migaa")."""
+    the area ("Wanza from Migaa")."""
     first = first_name(name)
     wanted = place_words(*places) - {first}
     if first is None or not wanted:

@@ -35,8 +35,8 @@ BROCHURES = "pending_partner_brochures"
 NOT_AVAILABLE = "Adding partners needs MISTRAL_API_KEY or DEEPSEEK_API_KEY to be set."
 ASK = (
     "Paste the details now: one partner, or a numbered list (1. ... 2. ...). Include the work "
-    "they do and any rates, e.g. 'Pesh Interiors 0714222776, interior design, about 1,500 per "
-    "sqm'. I'll show you what I understood before saving anything."
+    "they do and any rates, e.g. 'Jane Decor Interiors 0790001776, interior design, about "
+    "1,500 per sqm'. I'll show you what I understood before saving anything."
 )
 
 
@@ -220,7 +220,7 @@ async def partners_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if not found:
             return (
                 "No partners found yet." if not args else "No partners match that."
-            ) + " Add one with /partner, e.g. /partner Pesh Interiors 0714222776, interior "
+            ) + " Add one with /partner, e.g. /partner Jane Decor Interiors 0790001776, interior "
             "design, about 1,500 per sqm."
         lines = [f"Partners ({total})", ""]
         for p in found:
