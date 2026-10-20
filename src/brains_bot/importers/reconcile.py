@@ -113,6 +113,17 @@ def reconcile(sheets: dict[str, list[SourceRow]]) -> Reconciliation:
     projects: list[ProjectDraft] = []
     events: list[str] = []
     by_id: dict[int, ProjectDraft] = {}
+    used: set[str] = set()
+
+    def unique_key(row: SourceRow) -> str:
+        """Content key, numbered when two kept-separate rows would share one (same sheet,
+        same missing or duplicate ID, same site name), so neither overwrites the other."""
+        base = key = _content_key(row)
+        n = 2
+        while key in used:
+            key, n = f"{base}:{n}", n + 1
+        used.add(key)
+        return key
 
     for row in sheets.get(PRIMARY_SHEET, []):
         sid = row.source_id
@@ -120,7 +131,7 @@ def reconcile(sheets: dict[str, list[SourceRow]]) -> Reconciliation:
             draft = ProjectDraft(source_key=f"db:{sid}", primary=row)
             by_id[sid] = draft
         else:
-            draft = ProjectDraft(source_key=_content_key(row), primary=row)
+            draft = ProjectDraft(source_key=unique_key(row), primary=row)
             reason = "duplicate ID in Data Base" if sid is not None else "no ID in Data Base"
             draft.review_reasons.append(f"{reason} ({_where(row)})")
             events.append(f"{_where(row)}: {reason}; kept as a separate project")
@@ -132,7 +143,7 @@ def reconcile(sheets: dict[str, list[SourceRow]]) -> Reconciliation:
         for row in sheets.get(sheet, []):
             target = _match(row, by_id, projects, events)
             if target is None:
-                draft = ProjectDraft(source_key=_content_key(row), primary=row)
+                draft = ProjectDraft(source_key=unique_key(row), primary=row)
                 draft.links.append(Link(row, "primary"))
                 draft.review_reasons.append(f"only found in {_where(row)}")
                 projects.append(draft)

@@ -53,17 +53,40 @@ def _sentences(text: str) -> list[str]:
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
 
 
+# A clause that says a stage has not happened yet ("plastering has not started", "waiting for
+# roofing", "roofing will start next week") is not evidence of that stage.
+_NEGATED = re.compile(
+    r"\b(not|no|yet to|waiting|awaiting|pending|will|about to|plan(s|ned)? to|expected|"
+    r"upcoming|next|before)\b|n't\b|\bto (start|begin|commence)\b",
+    re.I,
+)
+_CLAUSE_BREAK = re.compile(r"[,;:]|\b(?:and|but|while|then|since|because)\b", re.I)
+
+
+def _stage_in(sentence: str) -> int | None:
+    """The most advanced stage a clause of the sentence affirms."""
+    found = None
+    for clause in _CLAUSE_BREAK.split(sentence):
+        if not clause.strip() or _NEGATED.search(clause):
+            continue
+        for stage, pattern in _PATTERNS:
+            if pattern.search(clause):
+                found = max(found or 0, stage)
+                break
+    return found
+
+
 def detect_stage(notes: list[tuple[date | None, str]]) -> StageResult:
     """Most advanced stage mentioned in any note, with the sentence and note date."""
     best = StageResult(None, None, None)
     for recorded_on, text in notes:
         for sentence in _sentences(text):
-            for stage, pattern in _PATTERNS:
-                if pattern.search(sentence):
-                    newer = (recorded_on or date.min) > (best.recorded_on or date.min)
-                    if best.stage is None or stage > best.stage or (stage == best.stage and newer):
-                        best = StageResult(stage, sentence[:300], recorded_on)
-                    break
+            stage = _stage_in(sentence)
+            if stage is None:
+                continue
+            newer = (recorded_on or date.min) > (best.recorded_on or date.min)
+            if best.stage is None or stage > best.stage or (stage == best.stage and newer):
+                best = StageResult(stage, sentence[:300], recorded_on)
     return best
 
 

@@ -124,3 +124,14 @@ def test_pages_quotes_and_metrics(client, factory, tmp_path):
         assert sum(audio["counts"].values()) == 3
         assert s.get(Project, pid) is not None
     assert "KES 300,000" in client.get("/").text
+
+
+def test_quote_package_must_match_category(client, factory, tmp_path):
+    ids = _seed(factory, tmp_path)
+    _log_in(client)
+    page = client.get(f"/projects/{ids['db:1']}").text
+    csrf = page.split('name="csrf" value="')[1].split('"')[0]
+    assert '<optgroup label="Home Audio &amp; Multi-room">' in page
+    mismatch = {"category": "smart_home", "amount": "1000", "product_sku": "A-WALL", "csrf": csrf}
+    response = client.post(f"/projects/{ids['db:1']}/quotes", data=mismatch)
+    assert response.status_code == 400 and "different category" in response.text

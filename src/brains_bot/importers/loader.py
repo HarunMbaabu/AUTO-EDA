@@ -249,9 +249,16 @@ class Loader:
             name = n.meaningful(value)
             if name is None or n.name_key(name) in {"client", "client s", "working with client"}:
                 continue
-            phone = (
-                n.normalize_phone(row.get("Contact Details")) if role == "contact_person" else None
-            )
+            phone = None
+            if role == "contact_person":
+                details = row.get("Contact Details")
+                if n.is_placeholder(details):
+                    # The number may be on another row of the same project naming this person.
+                    same = [
+                        r for r in rows if n.name_key(str(r.get(column) or "")) == n.name_key(name)
+                    ]
+                    details, _ = _first(same, "Contact Details")
+                phone = n.normalize_phone(details)
             contact = self._upsert_contact(name, role, phone, draft.source_key)
             self.session.add(
                 ProjectContact(project_id=project.id, contact_id=contact.id, role=role)
@@ -314,7 +321,8 @@ class Loader:
         kept: list[tuple[str, str, SourceRow]] = []
         for column, text, row in sorted(candidates, key=lambda c: -len(c[1])):
             key = n.name_key(text)
-            if any(key in n.name_key(other) for _, other, _ in kept):
+            # Whole words only: "Roofing done" is not a copy of "Waterproofing done".
+            if any(f" {key} " in f" {n.name_key(other)} " for _, other, _ in kept):
                 continue
             kept.append((column, text, row))
         kept.sort(key=lambda c: candidates.index(c))  # back to workbook order

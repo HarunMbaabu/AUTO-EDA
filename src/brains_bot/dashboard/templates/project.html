@@ -39,7 +39,7 @@
   <form class="quote-form" method="post" action="/projects/{{ d.summary.id }}/quotes">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>Category <select name="category" required>{% for c in categories %}<option value="{{ c.key }}">{{ c.name }}</option>{% endfor %}</select></label>
-    <label>Package <select name="product_sku"><option value="">— none —</option>{% for p in products %}<option value="{{ p.sku }}">{{ p.name }}</option>{% endfor %}</select></label>
+    <label>Package <select name="product_sku"><option value="">— none —</option>{% for key, group in products | groupby('category_key') %}<optgroup label="{{ category_names.get(key, key) }}">{% for p in group %}<option value="{{ p.sku }}">{{ p.name }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
     <label>Amount (KES) <input name="amount" inputmode="decimal" required placeholder="300,000"></label>
     <label class="wide">Note <input name="note" maxlength="500" placeholder="Optional"></label>
     <button type="submit">Add quote</button>

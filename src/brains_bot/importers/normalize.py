@@ -100,6 +100,19 @@ def normalize_phone(value: Any) -> PhoneResult:
     return result
 
 
+# Phone numbers inside free text, in every form normalize_phone accepts: 0712 345 678,
+# 712345678, +254 712 345 678, (+254) 712-345-678, 254712345678; plus any 9+ digit run.
+_PHONE_IN_TEXT = re.compile(
+    r"(?<![\w+])(?:\(?\+?\s?254\)?[\s.-]*|0)?[17](?:[\s.-]?\d){8}(?!\d)|(?<!\d)\d{9,}(?!\d)"
+)
+_EMAIL_IN_TEXT = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+
+
+def redact_contact_details(text: str) -> str:
+    """Free text with phone numbers and email addresses replaced; names are kept."""
+    return _EMAIL_IN_TEXT.sub("[email]", _PHONE_IN_TEXT.sub("[phone]", text))
+
+
 def mask_phone(e164: str | None) -> str:
     """+254712345678 -> +254 7XX XXX 678"""
     if not e164 or len(e164) < 7:
