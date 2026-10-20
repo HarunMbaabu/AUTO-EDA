@@ -52,7 +52,10 @@ def _contact_line(c: ContactView) -> str:
     elif c.phone_status == "multiple":
         line += f"\n    Phone: {c.phone_count} numbers on file; which one to use needs confirming"
     elif c.phone_status in ("invalid", "placeholder"):
-        line += "\n    Phone: not a usable number in the source"
+        line += (
+            "\n    Phone: not a usable number in the source (mistyped?). Send the right one "
+            "with /newsite as a follow-up"
+        )
     else:
         line += "\n    Phone: none recorded"
     line += f"\n    Marketing consent: {c.consent}"

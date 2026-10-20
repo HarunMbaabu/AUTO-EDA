@@ -126,7 +126,7 @@ def save_contact(
         )
         contact = Contact(contact_key=key, name=name or company or "Contact")
         session.add(contact)
-        if phone.numbers:
+        if phone.raw:  # a mistyped number is kept too, so it can be seen and corrected
             contact.phone_raw = phone.raw
             contact.phone_e164 = phone.e164
             contact.phone_status = phone.status

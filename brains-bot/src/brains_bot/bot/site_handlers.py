@@ -48,8 +48,14 @@ ITEM = {"new_site": "new", "follow_up": "note added to", "new_contact": "new con
         "contact_note": "note added to contact"}  # fmt: skip
 
 
+def _numbers(draft: sites.SiteDraft) -> str:
+    shown = [mask_phone(x) for x in draft.phone.numbers]
+    shown += [f"⚠ CHECK NUMBER: {p}" for p in sites.number_problems(draft.phone)]
+    return ", ".join(shown) or "no number"
+
+
 def _site_lines(n: int | None, draft: sites.SiteDraft) -> list[str]:
-    numbers = ", ".join(mask_phone(x) for x in draft.phone.numbers) or "no number"
+    numbers = _numbers(draft)
     role = draft.role_description or ROLE_LABELS[draft.contact_role]
     prefix = f"{n}. " if n is not None else ""
     if draft.kind == "contact":
@@ -100,6 +106,14 @@ def _preview(drafts: list[sites.SiteDraft]) -> str:
         when = f"Date: {next(iter(dates)):%d %b %Y} (from the message)."
     else:
         when = "Dates: as shown per site."
+    if any(d.phone.invalid_parts for d in drafts):
+        lines += [
+            "",
+            "⚠ A number marked CHECK NUMBER is not a valid Kenyan mobile number (10 digits, "
+            "e.g. 0712 345 678). Tap Cancel and send the message again with it corrected, or "
+            "save now and send the right number later as a follow-up: it will be added to "
+            "that site.",
+        ]
     lines += [
         "",
         when,
