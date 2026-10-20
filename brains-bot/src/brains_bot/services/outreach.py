@@ -130,7 +130,12 @@ def draft_request(session: Session, target: DraftTarget, today: date) -> dict[st
         },
         "category": {"name": target.category.name, "description": target.category.description},
         "catalog_options": [
-            {"name": p.name, "price": catalog.price_text(p), "sku": p.sku} for p in products
+            {
+                "name": no_contact_details(p.name),
+                "price": no_contact_details(catalog.price_text(p)),
+                "sku": p.sku,
+            }
+            for p in products
         ],
     }
 

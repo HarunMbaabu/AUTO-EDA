@@ -232,3 +232,30 @@ def test_ranking_ignores_outdated_fits_and_projects_gone_from_the_workbook(facto
         p2.review_reasons = [STALE_REASON]
         s.flush()
         assert p2.id not in {o.project_id for o in opportunities.rank(s, today, "audio", 10)}
+
+
+def test_draft_catalog_options_and_dashboard_leads(factory, tmp_path):
+    from brains_bot.importers.loader import STALE_REASON
+    from brains_bot.services import catalog, metrics, outreach
+    from tests.test_catalog import PRODUCTS, build_catalog
+    from tests.test_import_db import _import
+    from tests.workbook_factory import build_slim_workbook
+
+    _import(factory, build_slim_workbook(tmp_path / "slim.xlsx"))
+    noisy = [list(PRODUCTS[1])]
+    noisy[0][2] = "Wall pair, call 0722 111 222"
+    noisy[0][7] = "package (from) sales@prime.co.ke"
+    with session_scope(factory) as s:
+        sync_categories(s)
+        catalog.load_catalog(s, build_catalog(tmp_path / "c.xlsx", noisy))
+        project = s.scalar(select(Project).where(Project.source_key == "db:1"))
+        target = outreach.DraftTarget(project, None, resolve_category(s, "audio"))
+        request = outreach.draft_request(s, target, date(2025, 10, 1))
+        assert "0722" not in str(request) and "@" not in str(request)
+
+        before = metrics.crm(s, date(2025, 10, 1)).projects
+        project.review_reasons = [STALE_REASON]
+        s.flush()
+        crm = metrics.crm(s, date(2025, 10, 1))
+        assert crm.projects == before - 1
+        assert project.id not in {lead.project_id for lead in crm.best_now + crm.coming_up}
