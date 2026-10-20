@@ -24,7 +24,7 @@ from brains_bot.database.models import CatalogProduct, Contact, Project, Project
 from brains_bot.importers.normalize import redact_contact_details
 from brains_bot.logging_setup import redact
 from brains_bot.services import analysis as an
-from brains_bot.services import catalog, contacts, followups, opportunities
+from brains_bot.services import catalog, contacts, followups, opportunities, partners
 from brains_bot.services import project_service as svc
 from brains_bot.services.categories import active_categories, resolve_category
 from brains_bot.services.chat_api import ChatAnalyzer
@@ -76,7 +76,8 @@ Phone numbers are never available to you; for contact details tell the user to u
 results, with their exact names and prices, and end with a short line such as "Confirm \
 prices before quoting." Never invent products, brands, specifications or prices. \
 For people met for future work (contractors, interior designers, developers, ...) use \
-find_contacts; for their numbers tell the user to send /contacts <trade> <area>.\
+find_contacts; for people and companies we give jobs to, and their approximate rates, use \
+find_partners. For numbers tell the user to send /contacts or /partners.\
 """
 
 _FILTERS = {
@@ -213,6 +214,27 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "find_partners",
+            "description": "Partners: the people and companies we give jobs to (interior "
+            "designers, painters, installers, other suppliers), the work they do and their "
+            "approximate rates. Use for 'who can do interior design in Kiambu' or 'what does "
+            "our painter charge'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "A category key or group, e.g. interior_design, "
+                        "audio, 'Finishes & Interiors'",
+                    },
+                    "text": {"type": "string", "description": "Words in name, company or area"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "list_categories",
             "description": "The product categories that can be analysed, with their keys.",
             "parameters": {"type": "object", "properties": {}},
@@ -268,6 +290,7 @@ class ProjectTools:
             "find_products": self.find_products,
             "rank_opportunities": self.rank_opportunities,
             "find_contacts": self.find_contacts,
+            "find_partners": self.find_partners,
         }
         if name not in handlers:
             return {"error": f"unknown tool {name}"}
@@ -333,6 +356,38 @@ class ProjectTools:
                     "latest_note": no_contact_details(e.last_note or "")[:NOTE_CHARS] or None,
                 }
                 for e in entries
+            ],
+        }
+
+    def find_partners(self, category: str | None = None, text: str | None = None) -> dict[str, Any]:
+        keys = partners.category_keys(self.session, category)
+        if category and keys is None:
+            return {"error": f"unknown category or group {category!r}; see list_categories"}
+        found, total = partners.directory(self.session, keys, text, MAX_RESULTS)
+        names = partners.category_names(self.session)
+        return {
+            "total": total,
+            "partners": [
+                {
+                    "name": no_contact_details(p.contact.name),
+                    "company": no_contact_details(p.contact.company),
+                    "area": no_contact_details(p.contact.area),
+                    "work": [names.get(k, k) for k in p.contact.services or []],
+                    "rates": [
+                        {
+                            "job": no_contact_details(r.job),
+                            "category": r.category_key,
+                            "approx_kes": float(r.amount_kes) if r.amount_kes is not None else None,
+                            "approx_max_kes": float(r.amount_max_kes)
+                            if r.amount_max_kes is not None
+                            else None,
+                            "unit": r.unit,
+                            "noted_on": _iso(r.noted_on),
+                        }
+                        for r in p.rates[:6]
+                    ],
+                }
+                for p in found
             ],
         }
 

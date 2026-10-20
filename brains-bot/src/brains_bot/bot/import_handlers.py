@@ -40,12 +40,15 @@ async def import_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 def _catalog_summary(stats: catalog.CatalogStats) -> str:
-    lines = [f"Catalog loaded: {stats.products} products."]
+    lines = [
+        f"Catalog loaded: {stats.products} products from {', '.join(stats.suppliers)}.",
+        "Other suppliers' products are unchanged.",
+    ]
     lines += [f"- {key}: {count}" for key, count in sorted(stats.by_category.items())]
     if stats.unpriced:
         lines.append(f"- Without a price (shown as 'to be scoped'): {stats.unpriced}")
     if stats.deactivated:
-        lines.append(f"- No longer in the catalog (hidden): {stats.deactivated}")
+        lines.append(f"- No longer in these suppliers' lists (hidden): {stats.deactivated}")
     lines.append("/analyze and chat now suggest these products where they fit a project's stage.")
     return "\n".join(lines)
 

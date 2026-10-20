@@ -1,68 +1,240 @@
 {
-  "_comment": "Product categories for opportunity analysis. Stages: 1 foundation/early works, 2 structure/walling, 3 roofing, 4 plastering, 5 skimming/finishing prep, 6 painting under way, 7 complete/handed over. best_from..best_to is the ideal window; retrofit_to is the latest stage where retrofit options still make sense (null = none). Sync to the database with: uv run brains-bot-categories",
+  "_comment": "Product categories for opportunity analysis. Stages: 1 foundation/early works, 2 structure/walling, 3 roofing, 4 plastering, 5 skimming/finishing prep, 6 painting under way, 7 complete/handed over. best_from..best_to is the ideal window; retrofit_to is the latest stage where retrofit options still make sense (null = none). groups: the category groups it is listed under (a category can be in more than one, e.g. Solar). Sync to the database with: uv run brains-bot-categories",
   "categories": [
     {
       "key": "audio",
       "name": "Home Audio & Multi-room",
-      "description": "Home cinema and multi-room audio systems, including in-ceiling and in-wall speakers, amplifiers and streaming (Prime Audiovisuals).",
-      "best_from": 1, "best_to": 4, "retrofit_to": 7,
+      "groups": [
+        "Tech & Entertainment"
+      ],
+      "description": "Home cinema and multi-room audio systems, including in-ceiling and in-wall speakers, amplifiers and streaming.",
+      "best_from": 1,
+      "best_to": 4,
+      "retrofit_to": 7,
       "timing_note": "Speaker cabling and back boxes go in before plastering; after that, wireless and surface-mounted options remain."
     },
     {
-      "key": "painting",
-      "name": "Painting & Finishes",
-      "description": "Interior and exterior paint, premium and textured finishes, waterproofing and wallpapers.",
-      "best_from": 4, "best_to": 6, "retrofit_to": null,
-      "timing_note": "Paint and finish systems are chosen around plastering and skimming and applied before handover."
-    },
-    {
-      "key": "smart_home",
-      "name": "Smart Home Automation",
-      "description": "Smart lighting control, motorised blinds and curtains, smart climate control (AC, thermostats) and smart security (locks, cameras, gates).",
-      "best_from": 1, "best_to": 4, "retrofit_to": 7,
-      "timing_note": "Control wiring and conduit are easiest before plastering; wireless retrofit products exist for later stages."
-    },
-    {
       "key": "cinema_addons",
-      "name": "Home Cinema Add-ons",
-      "description": "Automated reclining cinema seating, acoustic wall panels and star-field ceilings.",
-      "best_from": 2, "best_to": 6, "retrofit_to": 7,
+      "name": "Home Cinema",
+      "groups": [
+        "Tech & Entertainment"
+      ],
+      "description": "Home cinema rooms: projectors and screens, automated reclining seating, acoustic wall panels and star-field ceilings.",
+      "best_from": 2,
+      "best_to": 6,
+      "retrofit_to": 7,
       "timing_note": "The room layout, acoustic treatment and ceiling are planned before finishes; seating can be added at the end."
     },
     {
-      "key": "joinery",
-      "name": "Custom Furniture & Joinery",
-      "description": "Built-in media walls and cabinets to house TVs and audio equipment, and other custom joinery.",
-      "best_from": 4, "best_to": 7, "retrofit_to": null,
-      "timing_note": "Measured and designed during finishing; installed near or after handover."
+      "key": "smart_home",
+      "name": "Smart Home",
+      "groups": [
+        "Tech & Entertainment"
+      ],
+      "description": "Smart lighting control, motorised blinds and curtains, smart climate control and whole-home automation.",
+      "best_from": 1,
+      "best_to": 4,
+      "retrofit_to": 7,
+      "timing_note": "Control wiring and conduit are easiest before plastering; wireless retrofit products exist for later stages."
     },
     {
-      "key": "outdoor",
-      "name": "Outdoor Living",
-      "description": "Weatherproof outdoor speakers, landscape and garden lighting, outdoor projectors and TVs.",
-      "best_from": 3, "best_to": 7, "retrofit_to": null,
-      "timing_note": "External cabling is best laid with landscaping works, which usually come late in the build."
+      "key": "security",
+      "name": "Security",
+      "groups": [
+        "Tech & Entertainment"
+      ],
+      "description": "CCTV, alarms, electric fencing, access control, video doorbells and smart locks.",
+      "best_from": 1,
+      "best_to": 4,
+      "retrofit_to": 7,
+      "timing_note": "Camera and alarm cabling is easiest before plastering; wireless systems can be added later."
     },
     {
       "key": "networking",
       "name": "Networking & IT",
+      "groups": [
+        "Tech & Entertainment"
+      ],
       "description": "Structured cabling and whole-home Wi-Fi mesh systems, needed for streaming audio and 4K video.",
-      "best_from": 1, "best_to": 4, "retrofit_to": 7,
+      "best_from": 1,
+      "best_to": 4,
+      "retrofit_to": 7,
       "timing_note": "Structured cabling goes in before plastering; mesh Wi-Fi can be added at any time."
+    },
+    {
+      "key": "solar",
+      "name": "Solar",
+      "groups": [
+        "Tech & Entertainment",
+        "Utilities"
+      ],
+      "description": "Solar PV and batteries, backup power and solar water heating.",
+      "best_from": 3,
+      "best_to": 6,
+      "retrofit_to": 7,
+      "timing_note": "Panels go on once the roof is done; conduit and the inverter space are planned before plastering."
+    },
+    {
+      "key": "painting",
+      "name": "Paint & Finishes",
+      "groups": [
+        "Finishes & Interiors"
+      ],
+      "description": "Interior and exterior paint, premium and textured finishes, waterproofing and wallpapers.",
+      "best_from": 4,
+      "best_to": 6,
+      "retrofit_to": null,
+      "timing_note": "Paint and finish systems are chosen around plastering and skimming and applied before handover."
     },
     {
       "key": "flooring",
       "name": "Flooring",
+      "groups": [
+        "Finishes & Interiors"
+      ],
       "description": "Acoustic underlays, hardwood floors and carpets, especially for media rooms and cinemas.",
-      "best_from": 4, "best_to": 6, "retrofit_to": 7,
+      "best_from": 4,
+      "best_to": 6,
+      "retrofit_to": 7,
       "timing_note": "Floor finishes are chosen during finishing and laid before or around painting."
+    },
+    {
+      "key": "lighting",
+      "name": "Lighting",
+      "groups": [
+        "Finishes & Interiors"
+      ],
+      "description": "Light fittings, chandeliers, LED strips, downlights and lighting design.",
+      "best_from": 2,
+      "best_to": 6,
+      "retrofit_to": 7,
+      "timing_note": "Lighting points are wired before plastering; fittings go up during finishing."
+    },
+    {
+      "key": "joinery",
+      "name": "Joinery & Cabinets",
+      "groups": [
+        "Finishes & Interiors"
+      ],
+      "description": "Kitchen and wardrobe cabinets, built-in media walls, doors and other custom joinery.",
+      "best_from": 4,
+      "best_to": 7,
+      "retrofit_to": null,
+      "timing_note": "Measured and designed during finishing; installed near or after handover."
+    },
+    {
+      "key": "curtains",
+      "name": "Curtains & Blinds",
+      "groups": [
+        "Finishes & Interiors"
+      ],
+      "description": "Curtains, blinds, rails and motorised window treatments.",
+      "best_from": 5,
+      "best_to": 7,
+      "retrofit_to": null,
+      "timing_note": "Measured once windows and walls are finished; hung near or after handover."
     },
     {
       "key": "interior_design",
       "name": "Interior Design",
+      "groups": [
+        "Finishes & Interiors"
+      ],
       "description": "Interior design services: space planning, finishes and colour schemes, lighting design, furnishing and décor.",
-      "best_from": 2, "best_to": 6, "retrofit_to": 7,
+      "best_from": 2,
+      "best_to": 6,
+      "retrofit_to": 7,
       "timing_note": "Design decisions are best made before finishes go in; décor and styling remain possible after handover."
+    },
+    {
+      "key": "paving",
+      "name": "Paving",
+      "groups": [
+        "Exterior & Landscaping"
+      ],
+      "description": "Driveways, walkways and patios: cabro, stone and concrete paving.",
+      "best_from": 6,
+      "best_to": 7,
+      "retrofit_to": null,
+      "timing_note": "Laid at the end of the build, once heavy machinery is off site."
+    },
+    {
+      "key": "gardens",
+      "name": "Gardens & Landscaping",
+      "groups": [
+        "Exterior & Landscaping"
+      ],
+      "description": "Landscape design, lawns, planting, irrigation and garden features.",
+      "best_from": 6,
+      "best_to": 7,
+      "retrofit_to": null,
+      "timing_note": "Done at the end of the build, after paving and external works."
+    },
+    {
+      "key": "fencing",
+      "name": "Fencing & Gates",
+      "groups": [
+        "Exterior & Landscaping"
+      ],
+      "description": "Boundary walls, fencing, gates and gate automation.",
+      "best_from": 1,
+      "best_to": 7,
+      "retrofit_to": null,
+      "timing_note": "Often built early to secure the site; gates and automation can come at any stage."
+    },
+    {
+      "key": "outdoor_audio",
+      "name": "Outdoor Audio",
+      "groups": [
+        "Exterior & Landscaping"
+      ],
+      "description": "Weatherproof garden and pool-side speakers and outdoor sound systems.",
+      "best_from": 3,
+      "best_to": 6,
+      "retrofit_to": 7,
+      "timing_note": "Outdoor speaker cabling is laid before paving and landscaping; wireless options remain afterwards."
+    },
+    {
+      "key": "outdoor",
+      "name": "Outdoor Living",
+      "groups": [
+        "Exterior & Landscaping"
+      ],
+      "description": "Outdoor kitchens, pergolas, outdoor projectors and TVs, and garden lighting.",
+      "best_from": 3,
+      "best_to": 7,
+      "retrofit_to": null,
+      "timing_note": "External cabling is best laid with landscaping works, which usually come late in the build."
+    },
+    {
+      "key": "water",
+      "name": "Water",
+      "groups": [
+        "Utilities"
+      ],
+      "description": "Water tanks, pumps, boreholes, water treatment and hot water systems.",
+      "best_from": 1,
+      "best_to": 4,
+      "retrofit_to": 7,
+      "timing_note": "Plumbing routes, tanks and pump positions are planned early; equipment can be upgraded later."
+    },
+    {
+      "key": "ac",
+      "name": "Air Conditioning",
+      "groups": [
+        "Utilities"
+      ],
+      "description": "Split and ducted air conditioning, ventilation and heat pumps.",
+      "best_from": 2,
+      "best_to": 4,
+      "retrofit_to": 7,
+      "timing_note": "Refrigerant piping and drains go in before plastering; wall units can be retrofitted."
     }
+  ],
+  "groups": [
+    "Tech & Entertainment",
+    "Finishes & Interiors",
+    "Exterior & Landscaping",
+    "Utilities"
   ]
 }

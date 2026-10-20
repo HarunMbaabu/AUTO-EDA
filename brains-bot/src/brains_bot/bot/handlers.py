@@ -34,6 +34,8 @@ PRIVATE_COMMANDS = {
     "contacts": "Contractors, interior designers, developers ... by trade",
     "repeats": "Projects that look like the same site entered twice",
     "merge": "Merge a repeat project into another: /merge <repeat> <keep>",
+    "partner": "Add people or companies you give jobs to, with their rates",
+    "partners": "Your partners by category or group, with rates",
     "top": "Best opportunities to pitch, with reasons; /top audio for one category",
     "followups": "Who to pitch and who to chase this week",
     "reminders": "Weekly Monday summary on or off: /reminders off",

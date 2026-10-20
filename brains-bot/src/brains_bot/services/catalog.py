@@ -2,8 +2,9 @@
 
 The catalog file has a 'Catalog' sheet with one row per product (see the template in the
 README). A file is checked completely before anything is stored: one bad row rejects the whole
-file, so a half-loaded catalog never reaches the sales team. Loading replaces the previous
-catalog; products missing from the new file are deactivated.
+file, so a half-loaded catalog never reaches the sales team. Each supplier's products are
+replaced by the suppliers named in the new file: a file with only Prime Audio rows updates Prime
+Audio and leaves other suppliers' products as they are.
 """
 
 from __future__ import annotations
@@ -47,6 +48,11 @@ class CatalogStats:
     by_category: dict[str, int] = field(default_factory=dict)
     deactivated: int = 0
     unpriced: int = 0
+    suppliers: list[str] = field(default_factory=list)
+
+
+def supplier_key(name: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (name or "").lower()).strip()
 
 
 def is_catalog_file(path: Path) -> bool:
@@ -195,13 +201,19 @@ def load_catalog(session: Session, path: Path) -> CatalogStats:
         product.active, product.source_file = True, path.name
         stats.by_category[row["category_key"]] = stats.by_category.get(row["category_key"], 0) + 1
         stats.unpriced += row["price_kes"] is None
+    suppliers = {supplier_key(row.get("supplier")) for row in rows}
+    stats.suppliers = sorted({row.get("supplier") or "(no supplier)" for row in rows})
     for product in existing.values():
-        if product.active:
+        if product.active and supplier_key(product.supplier) in suppliers:
             product.active = False
             stats.deactivated += 1
     stats.products = len(rows)
+    session.flush()
+    stocked = set(
+        session.scalars(select(CatalogProduct.category_key).where(CatalogProduct.active).distinct())
+    )
     for key, category in categories.items():
-        category.has_verified_catalog = key in stats.by_category
+        category.has_verified_catalog = key in stocked
     session.flush()
     return stats
 

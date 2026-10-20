@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from brains_bot.database.models import Category
 from brains_bot.importers.normalize import name_key
 
-FIELDS = ("name", "description", "best_from", "best_to", "retrofit_to", "timing_note")
+FIELDS = ("name", "groups", "description", "best_from", "best_to", "retrofit_to", "timing_note")
 
 
 def load_definitions() -> list[dict[str, Any]]:
@@ -38,11 +38,23 @@ def sync_categories(session: Session, definitions: list[dict[str, Any]] | None =
         for field in FIELDS:
             setattr(category, field, d.get(field))
         category.timing_note = d.get("timing_note") or ""
+        category.groups = d.get("groups") or []
         category.active = True
     for category in session.scalars(select(Category).where(Category.key.not_in(keys))):
         category.active = False
     session.flush()
     return len(definitions)
+
+
+def grouped(categories: list[Category]) -> list[tuple[str, list[Category]]]:
+    """[(group, categories)] in the order the groups first appear; ungrouped ones last."""
+    out: dict[str, list[Category]] = {}
+    for c in categories:  # groups in the order of each category's main (first) group
+        out.setdefault((c.groups or ["Other"])[0], [])
+    for c in categories:
+        for group in c.groups or ["Other"]:
+            out[group].append(c)
+    return list(out.items())
 
 
 def active_categories(session: Session) -> list[Category]:

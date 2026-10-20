@@ -36,7 +36,7 @@ from brains_bot.database.models import (
 )
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
 from brains_bot.importers.normalize import mask_phone
-from brains_bot.services import contacts, followups, metrics, opportunities
+from brains_bot.services import contacts, followups, metrics, opportunities, partners
 from brains_bot.services import project_service as svc
 from brains_bot.services.stages import detect_stage
 
@@ -292,6 +292,34 @@ def create_app(
                 "label": contacts.label,
                 "page": page,
                 "pages": pages,
+            },
+        )
+
+    @app.get("/partners", response_class=HTMLResponse)
+    def partners_page(
+        request: Request,
+        category: str = "",
+        q: str = "",
+        me=Depends(user),
+        session: Session = Depends(db),
+    ):
+        keys = partners.category_keys(session, category) if category else None
+        found, total = partners.directory(session, keys, q.strip())
+        from brains_bot.services.categories import active_categories, grouped
+
+        return render(
+            request,
+            "partners.html",
+            {
+                "user": me,
+                "partners": found,
+                "total": total,
+                "category": category,
+                "q": q,
+                "groups": grouped(active_categories(session)),
+                "names": partners.category_names(session),
+                "label": contacts.label,
+                "rate": partners.format_rate,
             },
         )
 

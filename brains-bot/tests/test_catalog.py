@@ -103,6 +103,15 @@ def test_load_suggest_and_replace(factory, tmp_path):
         )
         assert [p.sku for p in catalog.products_for(s, "audio")] == ["A-WIRED", "A-WALL"]
 
+    # Another supplier's price list leaves the others' products as they are.
+    other = ["audio", "B-SOUND", "Soundbar", "Sonos", "Acme Audio", "", 80000, "each",
+             "any time", "yes", "", None, ""]  # fmt: skip
+    with session_scope(factory) as s:
+        stats = catalog.load_catalog(s, build_catalog(tmp_path / "c3.xlsx", [other]))
+        assert stats.deactivated == 0 and stats.suppliers == ["Acme Audio"]
+        skus = [p.sku for p in catalog.products_for(s, "audio")]
+        assert skus == ["B-SOUND", "A-WIRED", "A-WALL"]
+
 
 def test_analysis_shows_catalog_options(factory, tmp_path):
     _import(factory, build_slim_workbook(tmp_path / "slim.xlsx"))
@@ -151,7 +160,9 @@ async def test_upload_loads_catalog(factory, tmp_path, context):
         ALLOWED_ID, name="catalog.xlsx", source=build_catalog(tmp_path / "c.xlsx")
     )
     await import_handlers.workbook_upload(update, context)
-    assert status.texts[-1].startswith("Catalog loaded: 4 products.")
+    assert status.texts[-1].startswith(
+        "Catalog loaded: 4 products from Intelligent Home, Prime Audio Solutions."
+    )
     assert "- audio: 3" in status.texts[-1]
 
     bad = build_catalog(

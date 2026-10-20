@@ -114,6 +114,10 @@ class Contact(TimestampMixin, Base):
     trade: Mapped[str | None] = mapped_column(String(40), index=True)  # see services/contacts.py
     company: Mapped[str | None] = mapped_column(Text)
     area: Mapped[str | None] = mapped_column(Text)
+    # A partner is someone we give jobs to (e.g. an interior designer), with the category keys
+    # of the work they do; see services/partners.py.
+    partner: Mapped[bool] = mapped_column(default=False, server_default=sa_false(), index=True)
+    services: Mapped[list[Any]] = mapped_column(default=list, server_default="[]")
 
 
 class ProjectContact(Base):
@@ -217,6 +221,8 @@ class Category(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     key: Mapped[str] = mapped_column(String(50), unique=True)
     name: Mapped[str] = mapped_column(String(120))
+    # e.g. ["Tech & Entertainment"]; a category can be in more than one group (Solar)
+    groups: Mapped[list[Any]] = mapped_column(default=list, server_default="[]")
     description: Mapped[str] = mapped_column(Text)
     best_from: Mapped[int]  # construction stage numbers, see services/stages.py
     best_to: Mapped[int]
@@ -248,8 +254,9 @@ class OpportunityAssessment(Base):
 
 
 class CatalogProduct(TimestampMixin, Base):
-    """A product or package from the verified catalog. Loading a new catalog file replaces the
-    old one: products missing from it are deactivated, not deleted."""
+    """A product or package from the verified catalog. Loading a catalog file replaces the
+    products of the suppliers in it: their products missing from it are deactivated, not
+    deleted."""
 
     __tablename__ = "catalog_products"
 
@@ -347,3 +354,22 @@ class ProjectAlias(Base):
     )
     merged_by: Mapped[int | None] = mapped_column(BigInteger)
     merged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PartnerRate(Base):
+    """A partner's approximate rate for a kind of job, as told to the sales team."""
+
+    __tablename__ = "partner_rates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contact_id: Mapped[int] = mapped_column(
+        ForeignKey("contacts.id", ondelete="CASCADE"), index=True
+    )
+    category_key: Mapped[str | None] = mapped_column(String(50), index=True)
+    job: Mapped[str] = mapped_column(Text)  # e.g. "painting, labour only"
+    amount_kes: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    amount_max_kes: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    unit: Mapped[str | None] = mapped_column(String(60))  # e.g. "per sqm", "per job"
+    noted_on: Mapped[date | None] = mapped_column(Date)
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

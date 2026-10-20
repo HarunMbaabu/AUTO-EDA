@@ -29,6 +29,8 @@ dashboard.
 | `/contacts [trade] [area]` | Authorized | The contacts directory by trade, e.g. `/contacts contractor Migaa`, `/contacts interior designer`; `/contacts` alone shows the counts per trade |
 | `/repeats` | Authorized | Projects that look like the same site entered twice (same number, or same contact name in the same area), with the `/merge` command for each |
 | `/merge <repeat> <keep>` | Authorized | Moves a repeat project's notes, people and numbers, drafts and quotes into the project kept, after a confirm button |
+| `/partner <message>` | Authorized | Add people or companies you give jobs to (one or a numbered list), with the work they do and approximate rates; check, then tap Save |
+| `/partners [category or group] [area]` | Authorized | Your partners with their rates, e.g. `/partners interior design`, `/partners finishes Kiambu` |
 | Any plain message | Authorized | Chat mode: ask in your own words, e.g. "which projects in Ruiru are at painting stage?" |
 | `/newchat`         | Authorized     | Starts a new conversation (forgets earlier questions) |
 | `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
@@ -220,6 +222,33 @@ specific trade replaces "site contact" or "company".
 Find people with `/contacts contractor Migaa`, by asking in chat ("which interior designers do
 we know?"), or on the dashboard's **Contacts** page, filtered by trade and area.
 
+## Categories and partners
+
+Categories sit in four groups (`/categories` lists them; a category can be in two groups):
+
+| Group | Categories |
+|-------|------------|
+| Tech & Entertainment | Audio, Home Cinema, Smart Home, Security, Networking, Solar |
+| Finishes & Interiors | Paint, Flooring, Lighting, Joinery & Cabinets, Curtains & Blinds, Interior Design |
+| Exterior & Landscaping | Paving, Gardens & Landscaping, Fencing & Gates, Outdoor Audio, Outdoor Living |
+| Utilities | Water, Air Conditioning, Solar |
+
+They are defined in `src/brains_bot/data/categories.json` (with the best construction stages for
+each) and synced when the bot starts.
+
+**Partners** are the people and companies you give jobs to. Paste a note after `/partner`:
+
+```
+/partner 1. Wanjiru, Nyumba Designs 0722000111, interior design and curtains, about 2,500 per sqm, Karen
+2. Otieno 0711222333, painting labour 250 to 300 per sqm
+```
+
+The preview shows the work (as categories) and each rate; Save stores them as approximate rates
+with the date. A known phone number adds to that person's entry, so rates build up over time.
+Find them with `/partners finishes`, `/partners audio Kiambu`, in chat ("who can do curtains,
+and what do they charge?") or on the dashboard's **Partners** page. Partners also appear in the
+contacts directory under their trade.
+
 ## WhatsApp drafts (`/draft`)
 
 `/draft 205 audio` writes a short, personal WhatsApp message to the project's contact person
@@ -307,8 +336,10 @@ The verified catalog is a spreadsheet with a `Catalog` sheet, one row per produc
 
 Send the file to the bot in Telegram (as with the workbook). The whole file is checked first:
 one bad row rejects it with a list of what to fix, so a half-loaded catalog never goes live.
-Loading replaces the previous catalog; products left out are hidden, not deleted. Categories
-with products are marked as having a verified catalog.
+Several suppliers can sit side by side (e.g. Prime Audio and another audio supplier): a file
+replaces only the products of the suppliers named in its `supplier` column, so each supplier
+can send their own price list. A supplier's products left out of their new file are hidden, not
+deleted. Categories with products are marked as having a verified catalog.
 
 `/analyze` then lists **catalog options that fit the project's recorded stage** (normal
 installs first, then retrofit options, cheapest first) and the AI may mention only those, by

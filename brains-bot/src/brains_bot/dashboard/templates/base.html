@@ -17,6 +17,7 @@
     <a href="/opportunities" class="{{ 'active' if request.url.path.startswith('/opportunities') }}">Opportunities</a>
     <a href="/projects" class="{{ 'active' if request.url.path.startswith('/projects') }}">Projects</a>
     <a href="/contacts" class="{{ 'active' if request.url.path.startswith('/contacts') }}">Contacts</a>
+    <a href="/partners" class="{{ 'active' if request.url.path.startswith('/partners') }}">Partners</a>
   </nav>
   <div class="who">{{ user.name or user.id }} · <a href="/logout">Log out</a></div>
   {% endif %}
