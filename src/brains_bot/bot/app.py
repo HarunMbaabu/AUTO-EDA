@@ -23,6 +23,7 @@ from brains_bot.bot import (
     handlers,
     import_handlers,
     outreach_handlers,
+    partner_handlers,
     project_handlers,
     repeat_handlers,
     site_handlers,
@@ -111,6 +112,8 @@ def build_application(settings: Settings) -> Application:
         "contacts": contact_handlers.contacts_command,
         "repeats": repeat_handlers.repeats_command,
         "merge": repeat_handlers.merge_command,
+        "partner": partner_handlers.partner_command,
+        "partners": partner_handlers.partners_command,
         "top": followup_handlers.top,
         "followups": followup_handlers.followups_command,
         "reminders": followup_handlers.reminders,
@@ -127,6 +130,11 @@ def build_application(settings: Settings) -> Application:
     )
     application.add_handler(
         CallbackQueryHandler(repeat_handlers.merge_callback, pattern=repeat_handlers.MERGE_CALLBACK)
+    )
+    application.add_handler(
+        CallbackQueryHandler(
+            partner_handlers.partner_callback, pattern=partner_handlers.PARTNER_CALLBACK
+        )
     )
     application.add_handler(
         CallbackQueryHandler(

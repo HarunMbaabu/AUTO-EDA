@@ -122,11 +122,15 @@ def category_list(categories) -> str:
 
     if not categories:
         return "No categories are set up yet. Run: uv run brains-bot-categories"
-    lines = ["Categories", ""]
-    for c in categories:
-        catalog = "verified catalog" if c.has_verified_catalog else "no catalog yet"
-        lines.append(f"{c.key}: {c.name}")
-        lines.append(f"    Best time: {STAGES[c.best_from]} to {STAGES[c.best_to]} · {catalog}")
+    from brains_bot.services.categories import grouped
+
+    lines = ["Categories"]
+    for group, items in grouped(categories):
+        lines += ["", group.upper()]
+        for c in items:
+            catalog = "catalog" if c.has_verified_catalog else "no catalog yet"
+            window = f"{STAGES[c.best_from]} to {STAGES[c.best_to]}"
+            lines.append(f"{c.key}: {c.name} · {window} · {catalog}")
     lines += ["", "Use: /analyze <project number> <category>, e.g. /analyze 205 audio"]
     return truncate("\n".join(lines), MAX_MESSAGE)
 

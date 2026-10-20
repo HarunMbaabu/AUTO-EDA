@@ -156,3 +156,24 @@ def test_contacts_page_filters_by_trade(client, factory):
     assert "Called on 04 Feb 2026" in page and "Noted on 15 Feb 2026" in page
     only = client.get("/contacts", params={"trade": "contractor", "q": "Migaa"}).text
     assert "Florissant Construction" in only and "Pesh Interiors" not in only
+
+
+def test_partners_page(client, factory):
+    from brains_bot.importers.normalize import normalize_phone
+    from brains_bot.services import partners
+    from brains_bot.services.categories import sync_categories
+
+    with session_scope(factory) as s:
+        sync_categories(s)
+        draft = partners.PartnerDraft(
+            message="Pesh", name="Pesh", company="Pesh Interiors", area="Kiambu",
+            trade="interior_designer", services=["interior_design"],
+            rates=[partners.RateDraft("interior_design", "design", 1500, None, "per sqm")],
+            note=None, phone=normalize_phone("0714222776"),
+        )  # fmt: skip
+        partners.save(s, draft, date(2026, 10, 12))
+    _log_in(client)
+    page = client.get("/partners", params={"category": "Finishes & Interiors"}).text
+    assert "Pesh Interiors" in page and "design: KES 1,500 per sqm" in page
+    assert "714222776" not in page
+    assert "Pesh Interiors" not in client.get("/partners", params={"category": "audio"}).text
