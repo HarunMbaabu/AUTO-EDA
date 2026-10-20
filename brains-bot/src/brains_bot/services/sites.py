@@ -41,13 +41,15 @@ MAX_SITES = 20
 _MAP_LINK = re.compile(
     r"https?://(?:maps\.app\.goo\.gl|goo\.gl/maps|(?:www\.)?google\.[a-z.]+/maps)\S*", re.I
 )
-_ITEM_START = re.compile(r"^\s*(\d{1,2})\s*[.)]\s+", re.M)
+# A list number: at a line start or after a space or full stop, followed by a word. Only an
+# ascending run 1, 2, 3 ... counts, so "Riverview 79." or "3 floors" never split a site.
+_ITEM_MARK = re.compile(r"(?:^|(?<=[\s.!?…]))(\d{1,2})\s*[.)]\s*(?=[A-Za-z])", re.M)
 
 EXTRACT_PROMPT = """\
 A sales person in Kenya pasted a WhatsApp report about building sites they visited. You get \
 JSON with "context" (any intro text) and "items" (one entry per site). Reply with one JSON \
-object {{"sites": [...]}} holding exactly {count} objects, one per item, in the same order, \
-each with exactly these keys:
+object {{"visit_date": ..., "sites": [...]}} where "sites" holds exactly {count} objects, \
+one per item, in the same order, each with exactly these keys:
 - "site_name": the name the item starts with or states (e.g. "Dennis project", "Pesh Villa"); \
 if the item starts with only a person's name, "<that name> project"; never invent names
 - "area": the estate, road or neighbourhood stated in the item (e.g. "Riverview 79"), or null
@@ -56,6 +58,10 @@ if the item starts with only a person's name, "<that name> project"; never inven
 - "contact_role": one of "contractor", "owner", "architect", "contact_person"
 - "role_description": the person's role in a few words as stated (e.g. "paint contractor", \
 "caretaker", "interior designer"), or null
+- "visit_date": YYYY-MM-DD if this item states its own visit date, else null
+Also add a top-level key "visit_date": the date the visits happened if the report states one \
+(e.g. "20/10/2026", "13th Oct", "yesterday", "on Monday"), as YYYY-MM-DD, else null. Today is \
+{today}; Kenyan dates are written day first.
 Contact details were removed and appear as [phone] or [email]. Use only what the text says.\
 """
 
@@ -73,6 +79,7 @@ class SiteDraft:
     map_url: str | None
     existing_project_id: int | None = None  # set when this is a follow-up on a known project
     existing_name: str | None = None
+    visit_date: date | None = None  # stated in the message; None means "today"
 
 
 def _clean(value: Any, limit: int = 120) -> str | None:
@@ -89,28 +96,51 @@ def find_phones(text: str) -> n.PhoneResult:
 
 
 def split_report(message: str) -> tuple[str, list[str]]:
-    """(intro, one text per site). A numbered list of two or more entries is split; anything
-    else is a single site with no intro."""
-    starts = [m.start() for m in _ITEM_START.finditer(message)]
-    if len(starts) < 2:
+    """(intro, one text per site). A numbered list of two or more entries is split, even when
+    the line breaks were lost in pasting; anything else is a single site with no intro."""
+    marks, expected = [], 1
+    for m in _ITEM_MARK.finditer(message):
+        if int(m.group(1)) == expected:
+            marks.append(m)
+            expected += 1
+    if len(marks) < 2:
         return "", [message.strip()]
-    intro = message[: starts[0]].strip()
-    items = [message[a:b].strip() for a, b in zip(starts, [*starts[1:], len(message)], strict=True)]
-    return intro, [_ITEM_START.sub("", item, count=1).strip() for item in items][:MAX_SITES]
+    intro = message[: marks[0].start()].strip()
+    ends = [m.start() for m in marks[1:]] + [len(message)]
+    items = [message[m.end() : end].strip() for m, end in zip(marks, ends, strict=True)]
+    return intro, [item for item in items if item][:MAX_SITES]
+
+
+MAX_AGE_DAYS = 400
+
+
+def _visit_date(value: Any, today: date) -> date | None:
+    """A stated visit date, only if it is a real date that is not in the future or too old."""
+    try:
+        found = date.fromisoformat(str(value)[:10]) if value else None
+    except ValueError:
+        return None
+    if found is None or found > today or (today - found).days > MAX_AGE_DAYS:
+        return None
+    return found
 
 
 def _for_ai(text: str) -> str:
     return n.redact_contact_details(_MAP_LINK.sub("[map link]", text))
 
 
-def extract(transport: Any, message: str) -> list[SiteDraft]:
+def extract(transport: Any, message: str, today: date | None = None) -> list[SiteDraft]:
+    today = today or date.today()
     message = message.strip()[:MAX_MESSAGE_CHARS]
     intro, items = split_report(message)
     payload = {"context": _for_ai(intro) or None, "items": [_for_ai(item) for item in items]}
     body = {
         "model": transport.model,
         "messages": [
-            {"role": "system", "content": EXTRACT_PROMPT.format(count=len(items))},
+            {
+                "role": "system",
+                "content": EXTRACT_PROMPT.format(count=len(items), today=today.isoformat()),
+            },
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ],
         "response_format": {"type": "json_object"},
@@ -123,6 +153,7 @@ def extract(transport: Any, message: str) -> list[SiteDraft]:
         answer = json.loads(content)
     except json.JSONDecodeError as exc:
         raise AnalysisError("the AI's answer could not be read; please try again") from exc
+    report_date = _visit_date(answer.get("visit_date"), today) if isinstance(answer, dict) else None
     found = answer.get("sites") if isinstance(answer, dict) else None
     if not isinstance(found, list):  # a single object is fine for a single site
         found = [answer] if isinstance(answer, dict) and len(items) == 1 else []
@@ -149,6 +180,7 @@ def extract(transport: Any, message: str) -> list[SiteDraft]:
                 role_description=_clean(fields.get("role_description"), 60),
                 phone=find_phones(_MAP_LINK.sub(" ", item)),
                 map_url=map_match.group(0) if map_match else None,
+                visit_date=_visit_date(fields.get("visit_date"), today) or report_date,
             )
         )
     return drafts
@@ -215,7 +247,9 @@ def _note(draft: SiteDraft) -> str:
 
 
 def save(session: Session, draft: SiteDraft, today: date) -> Project:
-    """A follow-up adds a dated note to its project; anything else becomes a new project."""
+    """A follow-up adds a dated note to its project; anything else becomes a new project. The
+    visit date is the one stated in the message, else today."""
+    today = draft.visit_date or today
     if draft.existing_project_id is not None:
         project = session.get(Project, draft.existing_project_id)
         if project is not None:

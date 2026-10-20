@@ -204,3 +204,40 @@ async def test_multi_site_preview_and_save_all(factory, context):
     tap.callback_query = query
     await site_handlers.site_callback(tap, context)
     assert query.edit_message_text.await_args.args[0].startswith("Saved: 3 new project(s)")
+
+
+def test_list_split_survives_lost_line_breaks_and_ignores_other_numbers():
+    joined = MULTI.replace("\n", " ")
+    intro, items = sites.split_report(joined)
+    assert len(items) == 3 and items[1].startswith("Dennis project 0708831086")
+    assert "Riverview 79" in items[1]  # "79." is not a list number
+    one = "Site at Riverview 79. 3 floors done, 2 more to go."
+    assert sites.split_report(one) == ("", [one])  # numbers out of sequence: not a list
+
+
+def test_visit_date_comes_from_the_message(factory):
+    today = date(2026, 10, 20)
+    answer = {**MULTI_ANSWER, "visit_date": "2026-10-17"}
+    answer["sites"] = [dict(x) for x in MULTI_ANSWER["sites"]]
+    answer["sites"][2]["visit_date"] = "2026-10-15"  # this site states its own date
+    transport = FakeTransport(text(json.dumps(answer)))
+    drafts = sites.extract(transport, MULTI, today)
+    assert "Today is 2026-10-20" in transport.requests[0]["messages"][0]["content"]
+    assert [d.visit_date for d in drafts] == [
+        date(2026, 10, 17),
+        date(2026, 10, 17),
+        date(2026, 10, 15),
+    ]
+    with session_scope(factory) as s:
+        project = sites.save(s, drafts[0], today)
+        assert project.site_visit_date == date(2026, 10, 17)
+        note = s.scalar(select(ProjectNote).where(ProjectNote.project_id == project.id))
+        assert note.observed_date == date(2026, 10, 17)
+
+
+def test_impossible_or_missing_dates_fall_back_to_today():
+    today = date(2026, 10, 20)
+    for value in ("2026-12-01", "2020-01-01", "17th Oct", None):
+        answer = {**ANSWER, "visit_date": value}
+        (draft,) = sites.extract(FakeTransport(text(json.dumps(answer))), REPORT, today)
+        assert draft.visit_date is None, value

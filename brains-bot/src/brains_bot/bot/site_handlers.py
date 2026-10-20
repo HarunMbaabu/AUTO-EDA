@@ -48,6 +48,8 @@ def _site_lines(n: int | None, draft: sites.SiteDraft) -> list[str]:
         head = f"{prefix}FOLLOW-UP → #{draft.existing_project_id} {draft.existing_name}"
         return [head, f"   adds this as a new note · {numbers}"]
     place = ", ".join(x for x in (draft.area, draft.city) if x) or "area not stated"
+    if draft.visit_date:
+        place += f" · visited {draft.visit_date:%d %b}"
     return [
         f"{prefix}NEW: {draft.site_name} · {place}",
         f"   {draft.contact_name or 'no name'} ({role}) · {numbers}"
@@ -60,9 +62,17 @@ def _preview(drafts: list[sites.SiteDraft]) -> str:
     lines = [f"{len(drafts)} sites: please check" if many else "New site: please check", ""]
     for i, draft in enumerate(drafts, start=1):
         lines += _site_lines(i if many else None, draft)
+    dates = {d.visit_date for d in drafts}
+    if dates == {None}:
+        when = f"Visit date: {date.today():%d %b %Y} (today; no date found in the message)."
+    elif len(dates) == 1:
+        when = f"Visit date: {next(iter(dates)):%d %b %Y} (from the message)."
+    else:
+        when = "Visit dates: as shown per site."
     lines += [
         "",
-        f"Visit date: {date.today():%d %b %Y}. Each site's own text is saved as its note. "
+        when,
+        "Each site's own text is saved as its note. "
         "Follow-ups are matched by phone number. If something is wrong, tap Cancel and send "
         "/newsite again with the message corrected.",
     ]
