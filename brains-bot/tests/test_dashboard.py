@@ -153,5 +153,6 @@ def test_contacts_page_filters_by_trade(client, factory):
     assert "Florissant Construction" in page and "Pesh Interiors" in page
     assert "+254 7XX XXX 545" in page and "701029545" not in page
     assert "0714222776" not in page  # numbers inside notes are masked too
+    assert "Called on 04 Feb 2026" in page and "Noted on 15 Feb 2026" in page
     only = client.get("/contacts", params={"trade": "contractor", "q": "Migaa"}).text
     assert "Florissant Construction" in only and "Pesh Interiors" not in only

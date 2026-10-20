@@ -46,7 +46,7 @@ def entry_lines(entry: contacts.Entry) -> list[str]:
         more = f" +{len(entry.projects) - 3} more" if len(entry.projects) > 3 else ""
         lines.append(f"   Sites: {sites}{more}")
     if entry.last_note:
-        when = f"{entry.last_note_on:%d %b %Y}: " if entry.last_note_on else ""
+        when = f"{entry.last_contact}: " if entry.last_contact else ""
         lines.append(f"   {when}{truncate(contacts.note_for_display(entry.last_note), 160)}")
     return lines
 
