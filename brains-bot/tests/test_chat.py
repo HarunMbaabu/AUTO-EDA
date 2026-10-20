@@ -189,7 +189,8 @@ async def test_chat_message_end_to_end(factory, tmp_path, context, caplog):
     await chat_handlers.chat_message(follow_up, context)
     assert reply_of(follow_up) == "Its stage is skimming."
     sent = [m["content"] for m in transport.requests[-1]["messages"]]
-    assert "Any news on Mr Kamau's villa? call 0712345678" in sent  # remembered for follow-ups
+    assert "Any news on Mr Kamau's villa? call [phone]" in sent  # remembered, number scrubbed
+    assert not any("0712345678" in m for m in sent)
 
     with session_scope(factory) as s:
         events = s.scalars(select(AuditEvent).where(AuditEvent.action == "chat")).all()

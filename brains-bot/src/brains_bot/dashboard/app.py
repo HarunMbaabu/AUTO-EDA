@@ -332,11 +332,16 @@ def create_app(
         if value <= 0:
             raise HTTPException(status_code=400, detail="The amount must be more than zero")
         sku = product_sku.strip() or None
-        if (
-            sku
-            and session.scalar(select(CatalogProduct.id).where(CatalogProduct.sku == sku)) is None
-        ):
-            raise HTTPException(status_code=400, detail="Unknown product")
+        if sku:
+            product_category = session.scalar(
+                select(CatalogProduct.category_key).where(CatalogProduct.sku == sku)
+            )
+            if product_category is None:
+                raise HTTPException(status_code=400, detail="Unknown product")
+            if product_category != category:
+                raise HTTPException(
+                    status_code=400, detail="That package belongs to a different category"
+                )
         quote = Quote(project_id=project_id, category_key=category, product_sku=sku,
                       amount_kes=value, note=note.strip()[:500], created_by=me["id"])  # fmt: skip
         session.add(quote)

@@ -21,6 +21,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from brains_bot.database.models import CatalogProduct, Contact, Project, ProjectContact
+from brains_bot.importers.normalize import redact_contact_details
 from brains_bot.logging_setup import redact
 from brains_bot.services import analysis as an
 from brains_bot.services import catalog, followups, opportunities
@@ -44,10 +45,6 @@ STAGE_KEYS = {
 STAGE_NAMES = {number: key for key, number in STAGE_KEYS.items()}
 NOT_RECORDED = "not_recorded"
 
-_PHONE = re.compile(r"(?<!\d)(?:\+?254|0)\s?[17](?:[\s-]?\d){8}(?!\d)|(?<!\d)\d{9,}(?!\d)")
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
-
-
 _MARKDOWN = re.compile(r"\*\*|__|^#{1,6}\s+|`", re.MULTILINE)
 
 
@@ -60,8 +57,7 @@ def no_contact_details(text: str | None) -> str | None:
     """Free text with phone numbers and email addresses removed; names are kept."""
     if text is None:
         return None
-    text = redact(text).replace("[REDACTED]", "[phone]")
-    return _EMAIL.sub("[email]", _PHONE.sub("[phone]", text))
+    return redact_contact_details(redact(text).replace("[REDACTED]", "[phone]"))
 
 
 SYSTEM_PROMPT = """\
@@ -289,9 +285,9 @@ class ProjectTools:
         p = row.project
         return {
             "id": p.id,
-            "name": p.name,
-            "area": p.area,
-            "city": p.city,
+            "name": no_contact_details(p.name),
+            "area": no_contact_details(p.area),
+            "city": no_contact_details(p.city),
             "site_visit_date": _iso(p.site_visit_date),
             "stage": row.stage.label,
             "stage_recorded_on": _iso(row.stage.recorded_on),
@@ -320,7 +316,9 @@ class ProjectTools:
                     else "no date"
                 )
             value = getattr(r.project, group_by, None)
-            return value.strip() if isinstance(value, str) and value.strip() else "not recorded"
+            if isinstance(value, str) and value.strip():
+                return no_contact_details(value.strip())
+            return "not recorded"
 
         groups = Counter(key(r) for r in rows)
         return {"total": len(rows), "group_by": group_by, "groups": dict(groups.most_common(40))}
@@ -341,9 +339,9 @@ class ProjectTools:
         self.projects_seen.add(project.id)
         return {
             "id": project.id,
-            "name": project.name,
-            "area": project.area,
-            "city": project.city,
+            "name": no_contact_details(project.name),
+            "area": no_contact_details(project.area),
+            "city": no_contact_details(project.city),
             "address": no_contact_details(project.address),
             "site_visit_date": _iso(project.site_visit_date),
             "people": [{"role": role, "name": no_contact_details(name)} for role, name in links],
@@ -375,8 +373,8 @@ class ProjectTools:
         return {
             "opportunities": [
                 {
-                    "project": f"#{o.project_id} {o.project}",
-                    "area": o.area,
+                    "project": no_contact_details(f"#{o.project_id} {o.project}"),
+                    "area": no_contact_details(o.area),
                     "category": o.category,
                     "category_key": o.category_key,
                     "score": o.score,
@@ -391,7 +389,7 @@ class ProjectTools:
             ],  # fmt: skip
             "sent_without_reply": [
                 {
-                    "project": f"#{w.project_id} {w.project}",
+                    "project": no_contact_details(f"#{w.project_id} {w.project}"),
                     "category": w.category,
                     "days_since_sent": w.days,
                 }
@@ -399,7 +397,7 @@ class ProjectTools:
             ],  # fmt: skip
             "open_quotes_to_chase": [
                 {
-                    "project": f"#{q.project_id} {q.project}",
+                    "project": no_contact_details(f"#{q.project_id} {q.project}"),
                     "category": q.category,
                     "amount": q.detail,
                     "days_open": q.days,
@@ -488,7 +486,7 @@ class ProjectTools:
                              assessment=assessment.id)  # fmt: skip
         self.projects_seen.add(project.id)
         return {
-            "project": f"#{project.id} {project.name}",
+            "project": no_contact_details(f"#{project.id} {project.name}"),
             "category": found.name,
             "fit": result.fit,
             "summary": result.summary,
@@ -515,8 +513,12 @@ class ChatAssistant:
     def answer(self, tools: ProjectTools, history: list[dict[str, str]], question: str) -> str:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": SYSTEM_PROMPT.format(today=tools.today.isoformat())},
-            *history[-HISTORY_MESSAGES:],
-            {"role": "user", "content": question},
+            # Contact details typed into a question never leave the bot, now or in follow-ups.
+            *[
+                {"role": m["role"], "content": no_contact_details(m["content"])}
+                for m in history[-HISTORY_MESSAGES:]
+            ],
+            {"role": "user", "content": no_contact_details(question)},
         ]
         for round_number in range(MAX_TOOL_ROUNDS + 1):
             body: dict[str, Any] = {

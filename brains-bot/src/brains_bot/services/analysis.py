@@ -29,6 +29,7 @@ from brains_bot.database.models import (
     ProjectNote,
     SourceRecord,
 )
+from brains_bot.importers.normalize import redact_contact_details
 from brains_bot.logging_setup import redact
 from brains_bot.services import catalog
 from brains_bot.services.stages import (
@@ -51,8 +52,8 @@ FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "clau
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 _PERSON = re.compile(
-    r"\b(Mr|Mrs|Ms|Miss|Madam|Mme|Dr|Eng|Arch|Prof|Pastor|Rev|Hon|Chairman)\.?\s+"
-    r"[A-Z][\w'-]+(\s+[A-Z][\w'-]+)?"
+    r"\b(?i:Mr|Mrs|Ms|Miss|Madam|Mme|Dr|Eng|Arch|Prof|Pastor|Rev|Hon|Chairman)\.?\s+"
+    r"[A-Za-z][\w'-]+(\s+[A-Z][\w'-]+)?"
 )
 
 SYSTEM_PROMPT = """\
@@ -166,10 +167,6 @@ class AnalysisContext:
     products: list[Any] = field(default_factory=list)  # catalog products that fit the stage
 
 
-_SPACED_PHONE = re.compile(r"(?<!\d)(?:\+?254|0)\s?[17](?:[\s-]?\d){8}(?!\d)")
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
-
-
 # Words in recorded names that are not personal names, so they are not scrubbed.
 _NOT_NAMES = {
     "mr", "mrs", "ms", "miss", "madam", "dr", "eng", "arch", "the", "and", "ltd", "limited",
@@ -180,7 +177,8 @@ _NOT_NAMES = {
     "tbc", "tba", "not", "specified", "architect", "systems", "home", "person",
     "solutions", "technologies", "international", "holdings", "enterprises", "agencies",
 }  # fmt: skip
-PERSON_ROLES = ("owner", "contact_person", "architect")
+# Every recorded party: contractors and companies can be people's names too.
+PERSON_ROLES = ("owner", "contact_person", "architect", "contractor", "company")
 
 
 def name_tokens(names: list[str]) -> set[str]:
@@ -191,9 +189,9 @@ def name_tokens(names: list[str]) -> set[str]:
 
 def scrub(text: str, known_names: set[str] = frozenset()) -> str:
     """Remove phone numbers, emails, 'Mr. Name'-style names and the project's recorded
-    owner/contact/architect names from free text."""
-    text = _SPACED_PHONE.sub("[phone]", redact(text).replace("[REDACTED]", "[phone]"))
-    text = _PERSON.sub("[person]", _EMAIL.sub("[email]", text))
+    names (site, people and companies) from free text."""
+    text = redact_contact_details(redact(text).replace("[REDACTED]", "[phone]"))
+    text = _PERSON.sub("[person]", text)
     for word in sorted(known_names, key=len, reverse=True):
         text = re.sub(rf"\b{re.escape(word)}\b", "[person]", text, flags=re.IGNORECASE)
     return re.sub(r"\[person\](\s+\[person\])+", "[person]", text)
@@ -221,7 +219,8 @@ def build_context(
         .where(ProjectContact.project_id == project.id)
     ).all()
     roles = sorted({role for role, _ in links})
-    names = name_tokens([name for role, name in links if role in PERSON_ROLES])
+    # The site name is scrubbed too ("Kamau proposed villa" -> Kamau): no site names leave.
+    names = name_tokens([project.name] + [name for role, name in links if role in PERSON_ROLES])
     batch_id = session.scalar(
         select(func.max(SourceRecord.batch_id)).where(SourceRecord.project_id == project.id)
     )
@@ -364,6 +363,8 @@ def recent_assessment(session: Session, ctx: AnalysisContext) -> OpportunityAsse
             OpportunityAssessment.data_batch_id == ctx.data_batch_id,
             OpportunityAssessment.created_at
             >= func.now() - func.make_interval(0, 0, 0, CACHE_DAYS),
+            # A category edited since (window, description) makes the saved answer stale.
+            OpportunityAssessment.created_at >= ctx.category.updated_at,
         )
         .order_by(OpportunityAssessment.id.desc())
         .limit(1)

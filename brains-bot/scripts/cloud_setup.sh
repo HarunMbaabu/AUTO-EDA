@@ -12,8 +12,9 @@ WORKBOOK="data/raw/Physical Projects Mapping Data 6th March.xlsx"
 
 echo "== PostgreSQL"
 service postgresql start >/dev/null
+SQL_PASS="${DB_PASS//\'/\'\'}"  # a quote in a custom password must not break the SQL
 su postgres -c "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'\"" | grep -q 1 \
-  || su postgres -c "psql -qc \"CREATE ROLE $DB_USER LOGIN PASSWORD '$DB_PASS'\""
+  || su postgres -c "psql -qc \"CREATE ROLE $DB_USER LOGIN PASSWORD '$SQL_PASS'\""
 for db in "$DB_NAME" "${DB_NAME}_test"; do
   su postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='$db'\"" | grep -q 1 \
     || su postgres -c "psql -qc \"CREATE DATABASE $db OWNER $DB_USER\""
@@ -21,8 +22,10 @@ done
 
 echo "== .env"
 touch .env && chmod 600 .env
-grep -q '^DATABASE_URL=' .env \
-  || echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME" >> .env
+if ! grep -q '^DATABASE_URL=.' .env; then  # missing or blank (e.g. copied from .env.example)
+  sed -i '/^DATABASE_URL=$/d' .env
+  echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME" >> .env
+fi
 grep -q '^CLAUDE_MODEL=' .env || echo "CLAUDE_MODEL=claude-opus-5-5" >> .env
 grep -q '^LOG_LEVEL=' .env || echo "LOG_LEVEL=INFO" >> .env
 for var in TELEGRAM_BOT_TOKEN TELEGRAM_ALLOWED_USER_IDS ANTHROPIC_API_KEY; do

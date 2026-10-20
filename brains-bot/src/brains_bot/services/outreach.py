@@ -121,8 +121,8 @@ def draft_request(session: Session, target: DraftTarget, today: date) -> dict[st
         "contact_name": first_name(target.contact.name if target.contact else None),
         "project": {
             "name": no_contact_details(target.project.name),
-            "area": target.project.area,
-            "city": target.project.city,
+            "area": no_contact_details(target.project.area),
+            "city": no_contact_details(target.project.city),
         },
         "construction_stage": {
             "last_recorded_stage": stage.label,
