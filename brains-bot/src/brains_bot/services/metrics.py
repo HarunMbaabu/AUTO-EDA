@@ -18,6 +18,7 @@ from brains_bot.database.models import (
     OpportunityAssessment,
     OutreachDraft,
     Project,
+    ProjectContact,
     Quote,
 )
 from brains_bot.services.stages import (
@@ -98,10 +99,19 @@ def _categories(session: Session) -> list[Category]:
 
 
 def crm(session: Session, today: date) -> Crm:
-    contacts = session.scalar(select(func.count(Contact.id))) or 0
+    # Only contacts still linked to a project: re-imports leave unlinked contact rows behind.
+    linked = (
+        select(Contact.id, Contact.phone_status)
+        .join(ProjectContact, ProjectContact.contact_id == Contact.id)
+        .distinct()
+        .subquery()
+    )
+    contacts = session.scalar(select(func.count()).select_from(linked)) or 0
     reachable = (
         session.scalar(
-            select(func.count(Contact.id)).where(Contact.phone_status.in_(("valid", "multiple")))
+            select(func.count())
+            .select_from(linked)
+            .where(linked.c.phone_status.in_(("valid", "multiple")))
         )
         or 0
     )
