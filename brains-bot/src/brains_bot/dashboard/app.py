@@ -46,7 +46,7 @@ log = logging.getLogger(__name__)
 
 HERE = Path(__file__).parent
 PAGE_SIZE = 25
-CONTACTS_LIMIT = 200
+CONTACTS_PAGE = 50
 QUOTE_STATUSES = ("open", "won", "lost")
 
 
@@ -111,6 +111,7 @@ def create_app(
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.filters["money"] = money
     templates.env.filters["phone"] = mask_phone
+    templates.env.filters["masked"] = contacts.note_for_display
     templates.env.globals["timing_labels"] = metrics.TIMING_LABELS
 
     def db():
@@ -261,11 +262,22 @@ def create_app(
         request: Request,
         trade: str = "",
         q: str = "",
+        page: int = 1,
         me=Depends(user),
         session: Session = Depends(db),
     ):
         key = trade if trade in contacts.TRADES else None
-        entries, total = contacts.directory(session, key, q.strip(), limit=CONTACTS_LIMIT)
+
+        def load(page: int):
+            offset = (page - 1) * CONTACTS_PAGE
+            return contacts.directory(session, key, q.strip(), CONTACTS_PAGE, offset)
+
+        page = max(page, 1)
+        entries, total = load(page)
+        pages = max(1, -(-total // CONTACTS_PAGE))
+        if page > pages:
+            page = pages
+            entries, total = load(page)
         return render(
             request,
             "contacts.html",
@@ -278,6 +290,8 @@ def create_app(
                 "trades": contacts.TRADES,
                 "counts": contacts.trade_counts(session),
                 "label": contacts.label,
+                "page": page,
+                "pages": pages,
             },
         )
 

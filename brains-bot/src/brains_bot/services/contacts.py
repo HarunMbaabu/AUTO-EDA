@@ -7,6 +7,7 @@ The same person is recognised by phone number, so new notes join their existing 
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import date
@@ -38,7 +39,15 @@ TRADES = {
     "owner": "Owner / client",
     "supplier": "Supplier / dealer",
     "other": "Other",
+    # From the workbook, where only the column a name was in is known:
+    "site_contact": "Site contact (role not stated)",
+    "company": "Company (role not stated)",
 }
+# Placeholders that a more specific trade from a later note replaces.
+GENERIC = {"site_contact", "company", "other"}
+# The workbook column / project role a person was named in -> their trade.
+ROLE_TRADES = {"contractor": "contractor", "architect": "architect", "owner": "owner",
+               "company": "company", "contact_person": "site_contact"}  # fmt: skip
 # Checked in order: the first keyword found in a role description decides the trade.
 _KEYWORDS = [
     ("interior", "interior_designer"), ("paint", "painter"), ("fundi", "painter"),
@@ -86,8 +95,10 @@ def by_phone(session: Session, numbers: list[str]) -> Contact | None:
 
 
 def fill(contact: Contact, trade: str | None, company: str | None, area: str | None) -> None:
-    """Add what is newly known; never overwrite what was recorded before."""
-    contact.trade = contact.trade or trade
+    """Add what is newly known; never overwrite what was recorded before (except a placeholder
+    trade such as 'site contact', which a specific one replaces)."""
+    if trade and (contact.trade is None or (contact.trade in GENERIC and trade not in GENERIC)):
+        contact.trade = trade
     contact.company = contact.company or company
     contact.area = contact.area or area
 
@@ -138,10 +149,14 @@ class Entry:
 
 
 def directory(
-    session: Session, trade: str | None = None, text: str | None = None, limit: int = LIST_LIMIT
+    session: Session,
+    trade: str | None = None,
+    text: str | None = None,
+    limit: int = LIST_LIMIT,
+    offset: int = 0,
 ) -> tuple[list[Entry], int]:
     """(entries, total) for people with a recorded trade, filtered by trade and by words in
-    their name, company, area or projects' areas. Most recently noted first."""
+    their name, company, area or projects' areas. Most recent note or site visit first."""
     query = select(Contact).where(Contact.trade.is_not(None))
     if trade:
         query = query.where(Contact.trade == trade)
@@ -169,11 +184,20 @@ def directory(
         .group_by(ContactNote.contact_id)
         .subquery()
     )
+    visited = (
+        select(ProjectContact.contact_id, func.max(Project.site_visit_date).label("on"))
+        .join(Project, Project.id == ProjectContact.project_id)
+        .group_by(ProjectContact.contact_id)
+        .subquery()
+    )
+    recent = func.coalesce(ContactNote.observed_date, visited.c.on)
     rows = session.execute(
         query.add_columns(ContactNote.text, ContactNote.observed_date)
         .outerjoin(latest, latest.c.contact_id == Contact.id)
         .outerjoin(ContactNote, ContactNote.id == latest.c.note_id)
-        .order_by(ContactNote.observed_date.desc().nulls_last(), Contact.id.desc())
+        .outerjoin(visited, visited.c.contact_id == Contact.id)
+        .order_by(recent.desc().nulls_last(), Contact.id.desc())
+        .offset(offset)
         .limit(limit)
     ).all()
     entries = [Entry(c, last_note=t, last_note_on=d) for c, t, d in rows]
@@ -188,6 +212,18 @@ def directory(
     for contact_id, project_id, name in links:
         by_contact[contact_id].projects.append((project_id, name))
     return entries, total
+
+
+def note_for_display(text: str | None) -> str | None:
+    """A note with any phone number in it masked like everywhere else (+254 7XX XXX 545)."""
+    if not text:
+        return text
+
+    def mask(match: re.Match[str]) -> str:
+        e164 = n.normalize_phone(match[0]).e164
+        return n.mask_phone(e164) if e164 else "[phone]"
+
+    return n.PHONE_IN_TEXT.sub(mask, text)
 
 
 def trade_counts(session: Session) -> list[tuple[str, int]]:

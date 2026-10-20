@@ -27,6 +27,7 @@ from brains_bot.database.models import (
 from brains_bot.importers import normalize as n
 from brains_bot.importers.reconcile import ProjectDraft, Reconciliation, reconcile
 from brains_bot.importers.workbook import DEALER_SHEETS, SourceRow, Workbook, read_workbook
+from brains_bot.services import contacts
 
 ROLE_COLUMNS = {
     "owner": "Name of Owners",
@@ -280,6 +281,7 @@ class Loader:
             contact = Contact(contact_key=key, name=name)
             self.session.add(contact)
             self.stats.contacts += 1
+        contacts.fill(contact, contacts.ROLE_TRADES.get(role), None, None)
         if phone is not None:
             contact.phone_raw = phone.raw
             contact.phone_e164 = phone.e164

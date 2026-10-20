@@ -198,6 +198,9 @@ trade as well (contractor, architect, caretaker, ...), so they appear in the dir
 
 Trades: contractor, developer, interior designer, architect, painter / fundi, site manager,
 engineer, foreman, quantity surveyor, caretaker, owner / client, supplier / dealer, other.
+People from the workbook get one from the column they were named in (owner, architect,
+contractor, company, or "site contact" for the contact person); a later note that states a
+specific trade replaces "site contact" or "company".
 Find people with `/contacts contractor Migaa`, by asking in chat ("which interior designers do
 we know?"), or on the dashboard's **Contacts** page, filtered by trade and area.
 
