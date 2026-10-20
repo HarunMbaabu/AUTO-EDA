@@ -20,6 +20,7 @@ from brains_bot.bot import (
     chat_handlers,
     handlers,
     import_handlers,
+    outreach_handlers,
     project_handlers,
 )
 from brains_bot.config import Settings
@@ -28,6 +29,7 @@ from brains_bot.services.analysis import ClaudeAnalyzer, make_client
 from brains_bot.services.categories import sync_categories
 from brains_bot.services.chat import ChatAssistant
 from brains_bot.services.chat_api import PROVIDERS, ChatAnalyzer
+from brains_bot.services.outreach import Drafter
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +84,9 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["assistant"] = (
         ChatAssistant(analyzer) if isinstance(analyzer, ChatAnalyzer) else None
     )
+    application.bot_data["drafter"] = (
+        Drafter(analyzer) if isinstance(analyzer, ChatAnalyzer) else None
+    )
 
     commands = {
         "start": handlers.start,
@@ -96,9 +101,15 @@ def build_application(settings: Settings) -> Application:
         "analyse": analysis_handlers.analyze,  # British spelling
         "import": import_handlers.import_help,
         "newchat": chat_handlers.new_chat,
+        "draft": outreach_handlers.draft,
     }
     for name, callback in commands.items():
         application.add_handler(CommandHandler(name, callback, filters=PRIVATE_CHAT))
+    application.add_handler(
+        CallbackQueryHandler(
+            outreach_handlers.draft_callback, pattern=outreach_handlers.DRAFT_CALLBACK
+        )
+    )
     application.add_handler(
         CallbackQueryHandler(
             project_handlers.projects_page_callback, pattern=project_handlers.PAGE_CALLBACK

@@ -261,3 +261,43 @@ class CatalogProduct(TimestampMixin, Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     source_file: Mapped[str | None] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(default=True)
+
+
+class OutreachDraft(Base):
+    """A WhatsApp message drafted by the AI for an operator to review. The bot never sends it:
+    'sent' means the operator opened it in WhatsApp from the bot."""
+
+    __tablename__ = "outreach_drafts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    category_key: Mapped[str] = mapped_column(String(50), index=True)
+    contact_id: Mapped[int | None] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"))
+    text: Mapped[str] = mapped_column(Text)
+    product_skus: Mapped[list[Any]] = mapped_column(default=list)
+    model: Mapped[str] = mapped_column(String(100))
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_by: Mapped[int | None] = mapped_column(BigInteger)
+    replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Quote(TimestampMixin, Base):
+    """A quote recorded by the sales team (in the dashboard), with its outcome."""
+
+    __tablename__ = "quotes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    category_key: Mapped[str] = mapped_column(String(50))
+    product_sku: Mapped[str | None] = mapped_column(String(80))
+    amount_kes: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    status: Mapped[str] = mapped_column(String(10), default="open")  # open | won | lost
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

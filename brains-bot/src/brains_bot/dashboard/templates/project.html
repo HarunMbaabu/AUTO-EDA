@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}#{{ d.summary.id }} {{ d.summary.name }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/projects">Projects</a> ›</p>
+<h1>#{{ d.summary.id }} {{ d.summary.name }}</h1>
+<p class="muted lede">{{ d.summary.area or "" }}{% if d.summary.city %}, {{ d.summary.city }}{% endif %}
+  · visited {{ d.summary.site_visit_date.strftime('%d %b %Y') if d.summary.site_visit_date else "date unknown" }}
+  {% if d.google_location_url %}· <a href="{{ d.google_location_url }}" target="_blank" rel="noopener">Map</a>{% endif %}</p>
+
+<div class="grid2">
+  <div class="card">
+    <h3>Stage</h3>
+    <p class="big">{{ stage.label }}</p>
+    {% if stage.recorded_on %}<p class="muted small">From the note of {{ stage.recorded_on.strftime('%d %b %Y') }}: “{{ stage.evidence }}”</p>{% endif %}
+    <h3>People</h3>
+    {% if d.contacts %}<table><tbody>{% for c in d.contacts %}<tr><td class="muted">{{ c.role.replace('_', ' ') }}</td><td>{{ c.name }}</td><td>{% if c.phone_e164 %}{{ c.phone_e164 | phone }}{% elif c.phone_status == 'multiple' %}{{ c.phone_count }} numbers{% else %}<span class="muted">{{ c.phone_status }}</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
+    {% else %}<p class="empty">No people on record.</p>{% endif %}
+    <p class="muted small">Numbers are masked here; WhatsApp links come from /draft in Telegram. Marketing consent: unknown.</p>
+  </div>
+  <div class="card">
+    <h3>Site notes</h3>
+    {% if d.notes %}<ul class="notes">{% for day, text in d.notes %}<li><span class="muted small">{{ day.strftime('%d %b %Y') if day else "no date" }}</span><br>{{ text }}</li>{% endfor %}</ul>
+    {% else %}<p class="empty">No notes.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card" id="quotes">
+  <h3>Quotes</h3>
+  {% if quotes %}
+  <table><thead><tr><th>Category</th><th>Package</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>
+  {% for q in quotes %}<tr>
+    <td>{{ category_names.get(q.category_key, q.category_key) }}</td><td>{{ product_names.get(q.product_sku, q.product_sku) if q.product_sku else "—" }}{% if q.note %}<div class="muted small">{{ q.note }}</div>{% endif %}</td>
+    <td class="num">{{ q.amount_kes | money }}</td>
+    <td>{% if q.status == 'won' %}<span class="badge good">✓ Won</span>{% elif q.status == 'lost' %}<span class="badge critical">✕ Lost</span>{% else %}<span class="badge info">Open</span>{% endif %}</td>
+    <td class="actions">{% for s in ['won', 'lost', 'open'] if s != q.status %}
+      <form method="post" action="/quotes/{{ q.id }}/status"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="{{ s }}"><button class="link" type="submit">Mark {{ s }}</button></form>{% endfor %}</td>
+  </tr>{% endfor %}</tbody></table>
+  {% else %}<p class="empty">No quotes yet.</p>{% endif %}
+  <form class="quote-form" method="post" action="/projects/{{ d.summary.id }}/quotes">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Category <select name="category" required>{% for c in categories %}<option value="{{ c.key }}">{{ c.name }}</option>{% endfor %}</select></label>
+    <label>Package <select name="product_sku"><option value="">— none —</option>{% for p in products %}<option value="{{ p.sku }}">{{ p.name }}</option>{% endfor %}</select></label>
+    <label>Amount (KES) <input name="amount" inputmode="decimal" required placeholder="300,000"></label>
+    <label class="wide">Note <input name="note" maxlength="500" placeholder="Optional"></label>
+    <button type="submit">Add quote</button>
+  </form>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h3>WhatsApp drafts</h3>
+    {% if drafts %}{% for dr in drafts %}<div class="draft">
+      <div class="muted small">{{ category_names.get(dr.category_key, dr.category_key) }} · {{ dr.created_at.strftime('%d %b %Y') }} ·
+      {% if dr.replied_at %}<span class="badge good">✓ Replied</span>{% elif dr.sent_at %}<span class="badge info">➤ Sent</span>{% else %}<span class="badge">Draft</span>{% endif %}</div>
+      <p>{{ dr.text }}</p></div>{% endfor %}
+    {% else %}<p class="empty">No drafts. In Telegram: <code>/draft {{ d.summary.id }} audio</code></p>{% endif %}
+  </div>
+  <div class="card">
+    <h3>Analyses</h3>
+    {% if analyses %}<table><thead><tr><th>Category</th><th>Fit</th><th>Date</th></tr></thead><tbody>
+    {% for a in analyses %}<tr><td>{{ category_names.get(a.category_key, a.category_key) }}</td><td>{{ a.result.fit.replace('_', ' ') }}</td><td>{{ a.created_at.strftime('%d %b %Y') }}</td></tr>{% endfor %}
+    </tbody></table>{% else %}<p class="empty">No analyses. In Telegram: <code>/analyze {{ d.summary.id }} audio</code></p>{% endif %}
+  </div>
+</div>
+{% endblock %}

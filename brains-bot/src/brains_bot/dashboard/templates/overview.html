@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<h1>Overview</h1>
+<p class="muted lede">Stages come from the dated site notes and may be out of date. Figures refresh on every page load.</p>
+
+<section class="section">
+  <h2>1 · Clients &amp; pipeline</h2>
+  <div class="tiles">
+    <div class="tile"><span class="label">Contacts</span><span class="value">{{ crm.contacts }}</span><span class="sub">{{ crm.reachable_contacts }} with a WhatsApp number</span></div>
+    <div class="tile"><span class="label">Projects</span><span class="value">{{ crm.projects }}</span><span class="sub">{{ crm.projects - unknown_stage }} with a recorded stage</span></div>
+    <div class="tile"><span class="label">Best time to pitch now</span><span class="value">{{ crm.pipeline | sum(attribute='counts.in_window') }}</span><span class="sub">project × category pairs in the best window</span></div>
+    <div class="tile"><span class="label">Stage unknown</span><span class="value">{{ unknown_stage }}</span><span class="sub">notes mention no construction stage</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Cross-sell pipeline by category</h3>
+    <p class="muted small">Projects per category by timing. "Stage unknown" ({{ unknown_stage }} per category) is left out of the chart.</p>
+    <div class="chart" style="height: {{ 60 + crm.pipeline|length * 34 }}px"><canvas id="pipelineChart" aria-label="Pipeline by category" role="img"></canvas></div>
+    <details><summary>Show as table</summary>
+      <table><thead><tr><th>Category</th>{% for s in ['in_window','retrofit_only','early','too_late','unknown'] %}<th class="num">{{ timing_labels[s] }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for p in crm.pipeline %}<tr><td>{{ p.name }}</td>{% for s in ['in_window','retrofit_only','early','too_late','unknown'] %}<td class="num">{{ p.counts[s] }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
+    </details>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Best time to pitch now</h3>
+      <p class="muted small">Projects in at least one category's best window, most recent notes first.</p>
+      {% with leads = crm.best_now %}{% include "_leads.html" %}{% endwith %}
+    </div>
+    <div class="card">
+      <h3>Coming into the window next</h3>
+      <p class="muted small">One stage before a category's best window: plan these visits.</p>
+      {% with leads = crm.coming_up %}{% include "_leads.html" %}{% endwith %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>2 · Bot performance</h2>
+  <div class="tiles">
+    <div class="tile"><span class="label">Messages drafted</span><span class="value">{{ bot.drafts }}</span><span class="sub">by the AI with /draft</span></div>
+    <div class="tile"><span class="label">Sent via WhatsApp</span><span class="value">{{ bot.sent }}</span><span class="sub">Send button taps</span></div>
+    <div class="tile"><span class="label">Response rate</span><span class="value">{% if bot.response_rate is not none %}{{ (bot.response_rate * 100) | round | int }}%{% else %}—{% endif %}</span><span class="sub">{{ bot.replied }} marked "They replied"</span></div>
+    <div class="tile"><span class="label">Most pitched category</span><span class="value small-value">{{ bot.most_pitched or "—" }}</span><span class="sub">{{ bot.analyses }} analyses so far</span></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Pitches by category</h3>
+      {% if bot.pitched %}
+      <div class="chart" style="height: {{ 80 + bot.pitched|length * 44 }}px"><canvas id="pitchedChart" aria-label="Analyses and drafts by category" role="img"></canvas></div>
+      <details><summary>Show as table</summary>
+        <table><thead><tr><th>Category</th><th class="num">Analyses</th><th class="num">Drafts</th><th class="num">Sent</th></tr></thead>
+        <tbody>{% for p in bot.pitched %}<tr><td>{{ p.name }}</td><td class="num">{{ p.analyses }}</td><td class="num">{{ p.drafts }}</td><td class="num">{{ p.sent }}</td></tr>{% endfor %}</tbody></table>
+      </details>
+      {% else %}<p class="empty">No analyses or drafts yet. Try /analyze or /draft in Telegram.</p>{% endif %}
+    </div>
+    <div class="card">
+      <h3>Latest drafts</h3>
+      {% if bot.recent_drafts %}
+      <table><thead><tr><th>Project</th><th>Category</th><th>Status</th></tr></thead><tbody>
+      {% for d in bot.recent_drafts %}<tr><td><a href="/projects/{{ d.project_id }}">#{{ d.project_id }} {{ d.project }}</a></td><td>{{ d.category }}</td>
+      <td>{% if d.replied %}<span class="badge good">✓ Replied</span>{% elif d.sent %}<span class="badge info">➤ Sent</span>{% else %}<span class="badge">Draft</span>{% endif %}</td></tr>{% endfor %}
+      </tbody></table>
+      {% else %}<p class="empty">No drafts yet. Send <code>/draft 205 audio</code> to the bot.</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>3 · Revenue</h2>
+  <div class="tiles">
+    <div class="tile"><span class="label">Value in pipeline</span><span class="value">{{ revenue.pipeline_value | money }}</span><span class="sub">{{ revenue.open_quotes }} open quote{{ '' if revenue.open_quotes == 1 else 's' }}</span></div>
+    <div class="tile"><span class="label">Won</span><span class="value">{{ revenue.won_value | money }}</span><span class="sub">{{ revenue.won }} quote{{ '' if revenue.won == 1 else 's' }}</span></div>
+    <div class="tile"><span class="label">Win rate</span><span class="value">{% if revenue.win_rate is not none %}{{ (revenue.win_rate * 100) | round | int }}%{% else %}—{% endif %}</span>
+      <span class="sub">{{ revenue.won }} won · {{ revenue.lost }} lost</span>
+      {% if revenue.won + revenue.lost %}<span class="ratio" role="img" aria-label="{{ revenue.won }} won, {{ revenue.lost }} lost"><span class="won" style="flex: {{ revenue.won }}"></span><span class="lost" style="flex: {{ revenue.lost }}"></span></span>{% endif %}
+    </div>
+    <div class="tile"><span class="label">Lost</span><span class="value">{{ revenue.lost_value | money }}</span><span class="sub">{{ revenue.lost }} quote{{ '' if revenue.lost == 1 else 's' }}</span></div>
+  </div>
+  <div class="card">
+    <h3>Top packages</h3>
+    {% if revenue.top_packages %}
+    <table><thead><tr><th>Package</th><th class="num">Named in drafts</th><th class="num">Quoted</th></tr></thead><tbody>
+    {% for p in revenue.top_packages %}<tr><td>{{ p.name }}</td><td class="num">{{ p.pitched }}</td><td class="num">{{ p.quoted }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="empty">No packages pitched or quoted yet. Record quotes on a project's page.</p>{% endif %}
+  </div>
+</section>
+
+<script type="application/json" id="chart-data">{{ charts | tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="/static/chart-4.4.1.umd.min.js"></script>
+<script src="/static/charts.js"></script>
+{% endblock %}

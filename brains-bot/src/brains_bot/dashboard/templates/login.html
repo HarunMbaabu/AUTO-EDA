@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<section class="login card">
+  <h1>Log in</h1>
+  <p class="muted">This dashboard is private. Log in with the Telegram account you use with the bot.</p>
+  {% if error == "denied" %}<p class="notice critical">That Telegram account is not on the bot's allowlist.</p>
+  {% elif error %}<p class="notice critical">The login could not be verified. Please try again.</p>{% endif %}
+  {% if bot_username %}
+  <script async src="https://telegram.org/js/telegram-widget.js?22"
+          data-telegram-login="{{ bot_username }}" data-size="large"
+          data-auth-url="/auth/telegram" data-request-access="write"></script>
+  {% else %}
+  <p class="notice">The bot's username is not configured (TELEGRAM_BOT_USERNAME).</p>
+  {% endif %}
+</section>
+{% endblock %}

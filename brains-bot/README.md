@@ -4,7 +4,8 @@ A human-in-the-loop sales intelligence assistant for authorized sales operators,
 private Telegram bot. It never sends messages to customers on its own: it prepares, a human
 reviews and sends.
 
-**Current status: Phase 3 (AI analysis, using Mistral).** Product catalogs (Phase 4) are not built yet.
+**Current status:** bot (lookup, analysis, chat, catalog, WhatsApp drafts) and web dashboard
+built, deployed on Render with Mistral. Opportunity ranking and follow-up reminders are next.
 
 ## Commands
 
@@ -19,6 +20,7 @@ reviews and sends.
 | `/project <number>`| Authorized     | One project: location, audio status, people, latest notes, review flags and source rows |
 | `/categories`      | Authorized     | Product categories and the construction stages when each is best pitched |
 | `/analyze <number> <category> [refresh]` | Authorized | AI assessment: fit, timing, recorded facts, inferred needs, unknowns, next step |
+| `/draft <number> <category>` | Authorized | AI-drafted WhatsApp message to the project's contact; **[Send via WhatsApp]** opens it in your WhatsApp (you press send), **[They replied]** records a reply |
 | Any plain message | Authorized | Chat mode: ask in your own words, e.g. "which projects in Ruiru are at painting stage?" |
 | `/newchat`         | Authorized     | Starts a new conversation (forgets earlier questions) |
 | `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
@@ -146,6 +148,52 @@ otherwise those fields stay empty.
 
 Re-running with the same file does nothing; `--force` re-imports without creating duplicates.
 Projects that disappear from a newer workbook are flagged, not deleted.
+
+## WhatsApp drafts (`/draft`)
+
+`/draft 205 audio` writes a short, personal WhatsApp message to the project's contact person
+(or owner) about that category, naming at most two catalog products that fit the recorded
+stage. The bot **never sends anything**: tapping **📤 Send via WhatsApp** records the draft as
+sent and shows an **Open WhatsApp** link (`wa.me`) that opens the message in your own
+WhatsApp, where you can edit it and press send. A contact with several numbers gets one button
+per number. **✅ They replied** records a reply, which feeds the dashboard's response rate.
+
+Marketing consent is imported as *unknown*, so every draft reminds you to send only to people
+who agreed to hear from you. The AI receives the contact's first name, the site name, area,
+stage and catalog options; phone numbers are only used locally to build the link.
+`OUTREACH_COMPANY` and `OUTREACH_SIGNATURE` set the company name and sign-off (default:
+Intelligent Home).
+
+## Dashboard (web)
+
+A private website, the "Command Center", reading the same database as the bot:
+
+- **Clients & pipeline:** contacts (and how many have a WhatsApp number), projects, the
+  cross-sell pipeline per category (best time now / retrofit only / coming up, from each
+  project's recorded stage and the category's window), the projects to pitch now and those
+  entering a window next. Stages come from dated notes; old ones are flagged "confirm".
+- **Bot performance:** messages drafted, sent via WhatsApp, response rate, most pitched
+  category, analyses and drafts per category, latest drafts.
+- **Revenue:** value of open quotes, won and lost value, win rate, top packages (named in
+  drafts and quoted). Quotes are recorded on each project's page (category, package, amount)
+  and marked won or lost there.
+
+The workbook has no paint start dates, quote values or outcomes, so timelines use the recorded
+construction stage, and revenue comes from the quotes you record.
+
+**Login:** "Log in with Telegram", accepted only for the IDs in `TELEGRAM_ALLOWED_USER_IDS`.
+Telegram's signature is checked with the bot token; sessions last 7 days.
+
+Run locally: `DASHBOARD_HTTPS_ONLY=0 uv run brains-bot-dashboard` (port 8000, or `$PORT`).
+
+**On Render**, `render.yaml` adds a web service `brains-bot-dashboard` (Starter plan) from the
+same image, sharing the database and taking the bot token and allowlist from the bot's
+service. After the first deploy:
+
+1. Note the dashboard's address, e.g. `https://brains-bot-dashboard.onrender.com`.
+2. In Telegram, send `/setdomain` to **@BotFather**, choose the bot and enter that address.
+   The login button only works on the domain set there.
+3. Open the address and log in with Telegram.
 
 ## Product catalog
 
@@ -303,11 +351,11 @@ tests/
 ## Roadmap
 
 1. **Secure Telegram bot.** Done.
-2. **Workbook profiling, cleaning and PostgreSQL import; `/projects`, `/search`, `/project`.** Done.
-3. **AI analysis (`/analyze`, `/categories`) with facts kept separate from inferences.** Built;
-   tested with simulated Mistral, DeepSeek and Claude responses, awaiting a live check.
-4. Verified product catalogs and grounded recommendations.
-5. Reviewable outreach drafts with prefilled WhatsApp/SMS links (manual send only).
-6. Opportunity ranking, follow-ups and deployment.
+2. **Workbook import and project lookup (`/projects`, `/search`, `/project`).** Done.
+3. **AI analysis (`/analyze`) and chat mode,** facts kept apart from inferences. Done (Mistral).
+4. **Verified product catalog and stage-aware suggestions.** Done.
+5. **WhatsApp drafts with manual send (`/draft`).** Done.
+6. **Web dashboard (pipeline, bot performance, revenue) with Telegram login.** Done.
+7. Opportunity ranking and follow-up reminders.
 
 The private workbook must never be committed. Put it in `data/raw/` locally.

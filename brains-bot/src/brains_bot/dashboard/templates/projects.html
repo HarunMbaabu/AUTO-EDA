@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Projects{% endblock %}
+{% block content %}
+<h1>Projects</h1>
+<form class="search" method="get" action="/projects">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search site, area, city or a person's name" aria-label="Search projects">
+  <button type="submit">Search</button>
+  {% if q %}<a href="/projects">Clear</a>{% endif %}
+</form>
+<p class="muted">{{ total }} project{{ '' if total == 1 else 's' }}{% if q %} matching “{{ q }}”{% endif %}, most recent visit first.</p>
+<div class="card flush">
+<table class="rows">
+  <thead><tr><th class="num">#</th><th>Site</th><th>Area</th><th>Visited</th><th>Last recorded stage</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td class="num">{{ r.project.id }}</td>
+    <td><a href="/projects/{{ r.project.id }}">{{ r.project.name }}</a>{% if r.project.needs_review %} <span class="badge warn">review</span>{% endif %}</td>
+    <td>{{ r.project.area or "—" }}<div class="muted small">{{ r.project.city or "" }}</div></td>
+    <td>{{ r.project.site_visit_date.strftime('%d %b %Y') if r.project.site_visit_date else "—" }}</td>
+    <td>{{ r.stage.label }}{% if r.stage.recorded_on %}<div class="muted small">{{ r.stage.recorded_on.strftime('%d %b %Y') }}</div>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="empty">No projects found.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="?q={{ q | urlencode }}&page={{ page - 1 }}">◀ Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a href="?q={{ q | urlencode }}&page={{ page + 1 }}">Next ▶</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

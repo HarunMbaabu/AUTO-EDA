@@ -14,10 +14,11 @@ def test_build_application_registers_commands(settings):
     }
     assert commands == {
         "start", "help", "myid", "health", "projects", "search", "project", "categories", "analyze",
-        "analyse", "import", "newchat",
+        "analyse", "import", "newchat", "draft",
     }  # fmt: skip
     assert app.bot_data["settings"] is settings
     assert app.bot_data["db"] is None  # no DATABASE_URL in the test settings
     assert app.bot_data["analyzer"] is None  # no ANTHROPIC_API_KEY or CLAUDE_MODEL
     assert app.bot_data["assistant"] is None
+    assert app.bot_data["drafter"] is None
     assert app.error_handlers
