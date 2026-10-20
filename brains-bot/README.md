@@ -31,6 +31,8 @@ dashboard.
 | `/merge <repeat> <keep>` | Authorized | Moves a repeat project's notes, people and numbers, drafts and quotes into the project kept, after a confirm button |
 | `/partner <message>` | Authorized | Add people or companies you give jobs to (one or a numbered list), with the work they do and approximate rates; check, then tap Save |
 | `/partners [category or group] [area]` | Authorized | Your partners with their rates, e.g. `/partners interior design`, `/partners finishes Kiambu` |
+| Send a PDF or photo | Authorized | A brochure: read its products into a catalog spreadsheet to check, keep it in the library, or add the company as a partner |
+| `/brochures [category, group or supplier]` | Authorized | The brochure library; tap one to get the file and forward it to a customer |
 | Any plain message | Authorized | Chat mode: ask in your own words, e.g. "which projects in Ruiru are at painting stage?" |
 | `/newchat`         | Authorized     | Starts a new conversation (forgets earlier questions) |
 | `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
@@ -362,6 +364,29 @@ Several suppliers can sit side by side (e.g. Prime Audio and another audio suppl
 replaces only the products of the suppliers named in its `supplier` column, so each supplier
 can send their own price list. A supplier's products left out of their new file are hidden, not
 deleted. Categories with products are marked as having a verified catalog.
+
+### From a brochure (PDF or photo)
+
+Send the brochure to the bot, ideally with the supplier's name as the caption (`Sauti Sound`),
+and pick what it is:
+
+- **📋 Read products into the catalog:** the bot reads the products and prices and replies with
+  a catalog spreadsheet: that supplier's products already in the catalog plus the brochure's,
+  with product codes, prices as numbers and a first guess at the install stage. Check each row
+  (the AI can misread numbers in pictures), then send the file back to load it. Nothing from a
+  brochure goes live before that, and only that supplier's products are replaced.
+- **📚 Save as a brochure only:** filed under its supplier and categories for `/brochures`.
+- **📇 A partner's brochure:** the company is added as a partner (the usual `/partner` preview,
+  then Save), with the brochure filed under them.
+
+Every brochure read is also kept in the library. PDFs with real text are read by the bot itself;
+photos and pictorial PDFs go to Mistral's document reader, or, where the account does not offer
+it, to the chat model one page at a time. Up to 30 pages, 20 MB (Telegram's limit). The file
+stays on Telegram's servers: the bot keeps its id and sends it again from there.
+
+Find brochures with `/brochures outdoor audio`, `/brochures finishes` or `/brochures Sauti`, and
+tap one to get the file to forward. A WhatsApp draft for a category that has brochures shows a
+**📎 Brochures** button, so the brochure can go to the customer with the message.
 
 `/analyze` then lists **catalog options that fit the project's recorded stage** (normal
 installs first, then retrofit options, cheapest first) and the AI may mention only those, by

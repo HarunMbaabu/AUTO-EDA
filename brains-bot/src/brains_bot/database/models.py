@@ -373,3 +373,27 @@ class PartnerRate(Base):
     noted_on: Mapped[date | None] = mapped_column(Date)
     created_by: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Brochure(Base):
+    """A supplier's or partner's brochure (PDF or photo). The file stays on Telegram's servers:
+    the bot keeps its file id and sends it again from there, so nothing is stored here."""
+
+    __tablename__ = "brochures"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    file_id: Mapped[str] = mapped_column(Text)
+    file_unique_id: Mapped[str] = mapped_column(String(120), unique=True)
+    kind: Mapped[str] = mapped_column(String(10))  # document | photo
+    file_name: Mapped[str | None] = mapped_column(Text)
+    mime: Mapped[str | None] = mapped_column(String(100))
+    size: Mapped[int | None]
+    title: Mapped[str] = mapped_column(Text)
+    supplier: Mapped[str | None] = mapped_column(Text)
+    category_keys: Mapped[list[Any]] = mapped_column(default=list, server_default="[]")
+    pages: Mapped[int | None]
+    contact_id: Mapped[int | None] = mapped_column(
+        ForeignKey("contacts.id", ondelete="SET NULL"), index=True
+    )
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

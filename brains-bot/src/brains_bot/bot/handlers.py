@@ -36,6 +36,7 @@ PRIVATE_COMMANDS = {
     "merge": "Merge a repeat project into another: /merge <repeat> <keep>",
     "partner": "Add people or companies you give jobs to, with their rates",
     "partners": "Your partners by category or group, with rates",
+    "brochures": "Suppliers' brochures to forward to customers (send me a PDF or photo to add one)",
     "top": "Best opportunities to pitch, with reasons; /top audio for one category",
     "followups": "Who to pitch and who to chase this week",
     "reminders": "Weekly Monday summary on or off: /reminders off",

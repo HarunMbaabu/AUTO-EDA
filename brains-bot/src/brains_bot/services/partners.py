@@ -85,12 +85,18 @@ def _amount(value: Any) -> Decimal | None:
 
 
 def extract(
-    transport: Any, message: str, categories: dict[str, str], today: date | None = None
+    transport: Any,
+    message: str,
+    categories: dict[str, str],
+    today: date | None = None,
+    single: bool = False,
 ) -> list[PartnerDraft]:
-    """One draft per provider in the message (a numbered list, or the whole message)."""
+    """One draft per provider in the message (a numbered list, or the whole message). With
+    single=True the whole text is one provider (e.g. their brochure, whose lists are not
+    separate providers)."""
     today = today or date.today()
     message = message.strip()[: sites.MAX_MESSAGE_CHARS]
-    intro, items = sites.split_report(message)
+    intro, items = ("", [message]) if single else sites.split_report(message)
     payload = {
         "context": sites._for_ai(intro) or None,
         "items": [sites._for_ai(item) for item in items],

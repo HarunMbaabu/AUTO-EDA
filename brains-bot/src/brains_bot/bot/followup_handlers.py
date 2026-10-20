@@ -17,7 +17,7 @@ from brains_bot.bot.handlers import _user_id, restricted
 from brains_bot.bot.project_handlers import DB_ERROR, _guard_db, _with_session
 from brains_bot.database.models import Category, Project
 from brains_bot.database.session import session_scope
-from brains_bot.services import followups, opportunities, outreach
+from brains_bot.services import brochures, followups, opportunities, outreach
 from brains_bot.services import project_service as svc
 from brains_bot.services.analysis import AnalysisError
 from brains_bot.services.categories import resolve_category
@@ -100,7 +100,8 @@ def ready_drafts(session: Session, drafter, actor: int | None, today: date) -> l
             log.warning("pushed draft failed", extra={"event": "draft_error"})
             continue
         seen.add(o.project_id)
-        out.append(outreach_handlers.draft_message(project, category, contact, created))
+        count = brochures.library(session, [category.key])[1]
+        out.append(outreach_handlers.draft_message(project, category, contact, created, count))
     return out
 
 
