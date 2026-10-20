@@ -90,8 +90,16 @@ class Revenue:
 
 
 def project_stages(session: Session) -> list[tuple[Project, StageResult]]:
+    """Projects in the latest workbook with their recorded stage. Projects flagged as missing
+    from the latest import are left out: they are not current leads."""
+    from brains_bot.importers.loader import STALE_REASON
+
     projects = session.scalars(select(Project).options(selectinload(Project.notes)))
-    return [(p, detect_stage([(n.observed_date, n.text) for n in p.notes])) for p in projects]
+    return [
+        (p, detect_stage([(n.observed_date, n.text) for n in p.notes]))
+        for p in projects
+        if STALE_REASON not in (p.review_reasons or [])
+    ]
 
 
 def _categories(session: Session) -> list[Category]:
