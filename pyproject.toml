@@ -15,7 +15,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "python-dotenv>=1.2.4",
     "python-multipart>=0.0.32",
-    "python-telegram-bot>=21",
+    "python-telegram-bot[job-queue]>=21",
     "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.54.0",
 ]

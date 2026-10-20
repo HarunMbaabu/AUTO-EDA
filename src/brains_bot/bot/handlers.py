@@ -30,6 +30,9 @@ PRIVATE_COMMANDS = {
     "categories": "Product categories and their best timing",
     "analyze": "Claude analysis for a project and category, e.g. /analyze 12 audio",
     "draft": "Draft a WhatsApp message for a project, e.g. /draft 205 audio",
+    "top": "Best opportunities to pitch, with reasons; /top audio for one category",
+    "followups": "Who to pitch and who to chase this week",
+    "reminders": "Weekly Monday summary on or off: /reminders off",
     "import": "How to load or update the data: send the workbook (.xlsx) as a file",
     "newchat": "Start a new conversation (or just ask a question in plain words)",
 }

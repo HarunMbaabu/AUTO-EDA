@@ -14,6 +14,7 @@
   {% if user %}
   <nav>
     <a href="/" class="{{ 'active' if request.url.path == '/' }}">Overview</a>
+    <a href="/opportunities" class="{{ 'active' if request.url.path.startswith('/opportunities') }}">Opportunities</a>
     <a href="/projects" class="{{ 'active' if request.url.path.startswith('/projects') }}">Projects</a>
   </nav>
   <div class="who">{{ user.name or user.id }} · <a href="/logout">Log out</a></div>

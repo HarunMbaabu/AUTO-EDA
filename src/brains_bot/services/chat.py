@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session, selectinload
 from brains_bot.database.models import CatalogProduct, Contact, Project, ProjectContact
 from brains_bot.logging_setup import redact
 from brains_bot.services import analysis as an
-from brains_bot.services import catalog
+from brains_bot.services import catalog, followups, opportunities
 from brains_bot.services import project_service as svc
 from brains_bot.services.categories import active_categories, resolve_category
 from brains_bot.services.chat_api import ChatAnalyzer
@@ -159,6 +159,23 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "rank_opportunities",
+            "description": "The best projects to pitch now, ranked by a points score with the "
+            "reasons (timing, how recent the stage note is, WhatsApp number, AI fit, recent "
+            "drafts). Use for 'who should I pitch', 'best leads', 'what to do this week'. Also "
+            "returns follow-ups: sent drafts with no reply and open quotes to chase.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "description": "Category key, e.g. audio"},
+                    "limit": {"type": "integer", "description": "How many, at most 15"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "find_products",
             "description": "Products and packages from the verified catalog, cheapest first. "
             "With project_id, only those that still fit that project's recorded stage.",
@@ -232,6 +249,7 @@ class ProjectTools:
             "analyze_opportunity": self.analyze_opportunity,
             "list_categories": self.list_categories,
             "find_products": self.find_products,
+            "rank_opportunities": self.rank_opportunities,
         }
         if name not in handlers:
             return {"error": f"unknown tool {name}"}
@@ -340,6 +358,54 @@ class ProjectTools:
             "note_count": len(notes),
             "needs_review": project.needs_review,
             "contact_details": f"phone numbers are not shared here; use /project {project.id}",
+        }
+
+    def rank_opportunities(
+        self, category: str | None = None, limit: int | None = None
+    ) -> dict[str, Any]:
+        key = None
+        if category:
+            found = resolve_category(self.session, str(category))
+            if found is None:
+                return {"error": f"unknown category '{category}'; call list_categories"}
+            key = found.key
+        size = max(1, min(int(limit or 10), 15))
+        items = opportunities.rank(self.session, self.today, key, size)
+        self.projects_seen.update(o.project_id for o in items)
+        return {
+            "opportunities": [
+                {
+                    "project": f"#{o.project_id} {o.project}",
+                    "area": o.area,
+                    "category": o.category,
+                    "category_key": o.category_key,
+                    "score": o.score,
+                    "stage": o.stage,
+                    "stage_recorded_on": _iso(o.recorded_on),
+                    "stage_possibly_out_of_date": o.stale,
+                    "reasons": o.reasons,
+                    "also_worth_pitching": o.also[:3],
+                    "draft_command": f"/draft {o.project_id} {o.category_key}",
+                }
+                for o in items
+            ],  # fmt: skip
+            "sent_without_reply": [
+                {
+                    "project": f"#{w.project_id} {w.project}",
+                    "category": w.category,
+                    "days_since_sent": w.days,
+                }
+                for w in followups.awaiting_reply(self.session, self.today)[:10]
+            ],  # fmt: skip
+            "open_quotes_to_chase": [
+                {
+                    "project": f"#{q.project_id} {q.project}",
+                    "category": q.category,
+                    "amount": q.detail,
+                    "days_open": q.days,
+                }
+                for q in followups.quotes_to_chase(self.session, self.today)[:10]
+            ],  # fmt: skip
         }
 
     def find_products(

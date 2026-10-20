@@ -14,6 +14,17 @@
   </div>
 
   <div class="card">
+    <h3>Top opportunities</h3>
+    <p class="muted small">Best category per project by score. <a href="/opportunities">Full ranking and reasons →</a></p>
+    {% if top %}
+    <table><thead><tr><th class="num">Score</th><th>Project</th><th>Category</th><th>Stage (recorded)</th></tr></thead><tbody>
+    {% for o in top %}<tr><td class="num"><strong>{{ o.score }}</strong></td><td><a href="/projects/{{ o.project_id }}">#{{ o.project_id }} {{ o.project }}</a><div class="muted small">{{ o.area or "" }}</div></td>
+    <td>{{ o.category }}</td><td>{{ o.stage }}<div class="muted small">{{ o.recorded_on.strftime('%d %b %Y') if o.recorded_on else "no date" }}{% if o.stale %} · <span class="badge warn">⚠ confirm</span>{% endif %}</div></td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="empty">No opportunities found.</p>{% endif %}
+  </div>
+
+  <div class="card">
     <h3>Cross-sell pipeline by category</h3>
     <p class="muted small">Projects per category by timing. "Stage unknown" ({{ unknown_stage }} per category) is left out of the chart.</p>
     <div class="chart" style="height: {{ 60 + crm.pipeline|length * 34 }}px"><canvas id="pipelineChart" aria-label="Pipeline by category" role="img"></canvas></div>
@@ -65,6 +76,22 @@
       </tbody></table>
       {% else %}<p class="empty">No drafts yet. Send <code>/draft 205 audio</code> to the bot.</p>{% endif %}
     </div>
+  </div>
+  <div class="card">
+    <h3>Follow-ups</h3>
+    <div class="grid2">
+      <div>
+        <p class="muted small">Sent, no reply after {{ reply_days }}+ days</p>
+        {% if waiting %}<table><tbody>{% for w in waiting[:10] %}<tr><td><a href="/projects/{{ w.project_id }}">#{{ w.project_id }} {{ w.project }}</a></td><td>{{ w.category }}</td><td class="num">{{ w.days }} days</td></tr>{% endfor %}</tbody></table>
+        {% else %}<p class="empty">Nothing waiting.</p>{% endif %}
+      </div>
+      <div>
+        <p class="muted small">Open quotes older than {{ quote_days }} days</p>
+        {% if to_chase %}<table><tbody>{% for q in to_chase[:10] %}<tr><td><a href="/projects/{{ q.project_id }}#quotes">#{{ q.project_id }} {{ q.project }}</a></td><td>{{ q.detail }}</td><td class="num">{{ q.days }} days</td></tr>{% endfor %}</tbody></table>
+        {% else %}<p class="empty">Nothing to chase.</p>{% endif %}
+      </div>
+    </div>
+    <p class="muted small">The bot sends this as a summary every Monday at 08:00 (Nairobi). /reminders off stops it.</p>
   </div>
 </section>
 

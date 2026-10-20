@@ -36,7 +36,7 @@ from brains_bot.database.models import (
 )
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
 from brains_bot.importers.normalize import mask_phone
-from brains_bot.services import metrics
+from brains_bot.services import followups, metrics, opportunities
 from brains_bot.services import project_service as svc
 from brains_bot.services.stages import detect_stage
 
@@ -204,12 +204,32 @@ def create_app(
             },
         }
         unknown = crm.pipeline[0]["counts"]["unknown"] if crm.pipeline else 0
+        today = date.today()
+        top = opportunities.rank(session, today, limit=5)
+        waiting = followups.awaiting_reply(session, today)
+        to_chase = followups.quotes_to_chase(session, today)
         return render(
             request,
             "overview.html",
             {"user": me, "crm": crm, "bot": bot, "revenue": revenue, "charts": charts,
-             "unknown_stage": unknown},
+             "unknown_stage": unknown, "top": top, "waiting": waiting, "to_chase": to_chase,
+             "reply_days": followups.REPLY_WAIT_DAYS, "quote_days": followups.QUOTE_WAIT_DAYS},
         )  # fmt: skip
+
+    @app.get("/opportunities", response_class=HTMLResponse)
+    def opportunities_page(
+        request: Request, category: str = "", me=Depends(user), session: Session = Depends(db)
+    ):
+        categories = list(
+            session.scalars(select(Category).where(Category.active).order_by(Category.id))
+        )
+        chosen = next((c for c in categories if c.key == category), None)
+        items = opportunities.rank(session, date.today(), chosen.key if chosen else None, 50)
+        return render(
+            request,
+            "opportunities.html",
+            {"user": me, "items": items, "categories": categories, "chosen": chosen},
+        )
 
     @app.get("/projects", response_class=HTMLResponse)
     def projects(
