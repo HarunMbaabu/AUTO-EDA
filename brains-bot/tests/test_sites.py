@@ -3,6 +3,7 @@ from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import pytest
 from sqlalchemy import select
 
 from brains_bot.bot import chat_handlers, handlers, site_handlers
@@ -221,7 +222,9 @@ def test_visit_date_comes_from_the_message(factory):
     answer["sites"] = [dict(x) for x in MULTI_ANSWER["sites"]]
     answer["sites"][2]["visit_date"] = "2026-10-15"  # this site states its own date
     transport = FakeTransport(text(json.dumps(answer)))
-    drafts = sites.extract(transport, MULTI, today)
+    # No date the bot can read itself in this intro, so the AI's reading is used.
+    report = MULTI.replace("today i will do my follow-up", "my follow-up")
+    drafts = sites.extract(transport, report, today)
     assert "Today is 2026-10-20" in transport.requests[0]["messages"][0]["content"]
     assert [d.visit_date for d in drafts] == [
         date(2026, 10, 17),
@@ -241,3 +244,30 @@ def test_impossible_or_missing_dates_fall_back_to_today():
         answer = {**ANSWER, "visit_date": value}
         (draft,) = sites.extract(FakeTransport(text(json.dumps(answer))), REPORT, today)
         assert draft.visit_date is None, value
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("Called below contacts for projects on 4th feb 2026", date(2026, 2, 4)),
+     ("on 4 February 2026", date(2026, 2, 4)), ("Feb 4, 2026", date(2026, 2, 4)),
+     ("04/02/2026", date(2026, 2, 4)), ("4.2.26", date(2026, 2, 4)),
+     ("2026-02-04", date(2026, 2, 4)), ("visited on 13th Oct", date(2026, 10, 13)),
+     ("visited 25 dec", date(2025, 12, 25)), ("Yesterday I visited", date(2026, 10, 19)),
+     ("On Monday i visited", date(2026, 10, 19)), ("call 0714222776 now", None),
+     ("Riverview 79. 3 floors", None), ("mid this month", None), ("4th feb 2027", None)],
+)  # fmt: skip
+def test_date_in_text(text, expected):
+    assert sites.date_in_text(text, date(2026, 10, 20), relative=True) == expected
+
+
+def test_report_date_is_read_by_the_bot_even_when_the_ai_misses_it():
+    report = (
+        "Called below contacts for projects on 4th feb 2026\n\n"
+        "1.Pesh Interiors 0714222776...... She is the interior designer at Golden palm.\n"
+        "2.Benjamin project 0715936549......After the call today he confirmed they will call."
+    )
+    answer = {"visit_date": None, "sites": [{"site_name": "Pesh Interiors"},
+                                            {"site_name": "Benjamin project"}]}  # fmt: skip
+    drafts = sites.extract(FakeTransport(text(json.dumps(answer))), report, date(2026, 10, 20))
+    # "today" inside site 2's own text does not override the report's date.
+    assert [d.visit_date for d in drafts] == [date(2026, 2, 4), date(2026, 2, 4)]

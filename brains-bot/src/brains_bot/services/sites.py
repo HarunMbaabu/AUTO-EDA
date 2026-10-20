@@ -125,6 +125,84 @@ def _visit_date(value: Any, today: date) -> date | None:
     return found
 
 
+_MONTHS = {
+    m: i
+    for i, m in enumerate(
+        ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"],
+        start=1,
+    )
+}
+_MONTH = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
+_ORD = r"(\d{1,2})(?:st|nd|rd|th)?"
+_DAY_MONTH = re.compile(rf"\b{_ORD}\s*(?:of\s+)?{_MONTH}(?:,?\s*(\d{{4}}|\d{{2}})\b)?", re.I)
+_MONTH_DAY = re.compile(rf"\b{_MONTH}\s+{_ORD}\b(?:,?\s*(\d{{4}}|\d{{2}})\b)?", re.I)
+_NUMERIC = re.compile(r"(?<![\d/.-])(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})(?![\d/.-])")
+_ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+_WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+_RELATIVE = re.compile(r"\b(yesterday|today|" + "|".join(_WEEKDAYS) + r")\b", re.I)
+
+
+def _year(value: str | None, today: date) -> int | None:
+    if not value:
+        return None
+    year = int(value)
+    return year + 2000 if year < 100 else year
+
+
+def _safe(year: int, month: int, day: int) -> date | None:
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _without_year(month: int, day: int, today: date) -> date | None:
+    """A day and month with no year: the most recent such date, not in the future."""
+    found = _safe(today.year, month, day)
+    if found and found > today:
+        found = _safe(today.year - 1, month, day)
+    return found
+
+
+def date_in_text(text: str, today: date, relative: bool = False) -> date | None:
+    """The first visit date written in the text, read by the bot itself (not the AI).
+    Day first, as dates are written in Kenya. Words like 'yesterday' or 'Monday' count only
+    when relative=True (the report's opening line), so "after the call today" inside one
+    site's text cannot override the report's date."""
+    candidates: list[tuple[int, date | None]] = []
+    for m in _ISO.finditer(text):
+        candidates.append((m.start(), _safe(int(m[1]), int(m[2]), int(m[3]))))
+    for m in _NUMERIC.finditer(text):
+        candidates.append((m.start(), _safe(_year(m[3], today), int(m[2]), int(m[1]))))
+
+    def named(month_text: str, day: str, year_text: str | None) -> date | None:
+        month, year = _MONTHS[month_text[:3].lower()], _year(year_text, today)
+        if year:
+            return _safe(year, month, int(day))
+        return _without_year(month, int(day), today)
+
+    for m in _DAY_MONTH.finditer(text):
+        candidates.append((m.start(), named(m[2], m[1], m[3])))
+    for m in _MONTH_DAY.finditer(text):
+        candidates.append((m.start(), named(m[1], m[2], m[3])))
+    if relative:
+        for m in _RELATIVE.finditer(text):
+            word = m[1].lower()
+            if word == "today":
+                found = today
+            elif word == "yesterday":
+                found = date.fromordinal(today.toordinal() - 1)
+            else:
+                back = (today.weekday() - _WEEKDAYS.index(word)) % 7
+                found = date.fromordinal(today.toordinal() - back)
+            candidates.append((m.start(), found))
+    for _, found in sorted(candidates, key=lambda c: c[0]):
+        checked = _visit_date(found.isoformat() if found else None, today)
+        if checked:
+            return checked
+    return None
+
+
 def _for_ai(text: str) -> str:
     return n.redact_contact_details(_MAP_LINK.sub("[map link]", text))
 
@@ -153,7 +231,10 @@ def extract(transport: Any, message: str, today: date | None = None) -> list[Sit
         answer = json.loads(content)
     except json.JSONDecodeError as exc:
         raise AnalysisError("the AI's answer could not be read; please try again") from exc
-    report_date = _visit_date(answer.get("visit_date"), today) if isinstance(answer, dict) else None
+    # Dates are read by the bot first; the AI's reading is only a fallback.
+    report_date = date_in_text(intro or message, today, relative=True)
+    if report_date is None and isinstance(answer, dict):
+        report_date = _visit_date(answer.get("visit_date"), today)
     found = answer.get("sites") if isinstance(answer, dict) else None
     if not isinstance(found, list):  # a single object is fine for a single site
         found = [answer] if isinstance(answer, dict) and len(items) == 1 else []
@@ -180,7 +261,11 @@ def extract(transport: Any, message: str, today: date | None = None) -> list[Sit
                 role_description=_clean(fields.get("role_description"), 60),
                 phone=find_phones(_MAP_LINK.sub(" ", item)),
                 map_url=map_match.group(0) if map_match else None,
-                visit_date=_visit_date(fields.get("visit_date"), today) or report_date,
+                visit_date=(
+                    (date_in_text(item, today) if intro else None)
+                    or _visit_date(fields.get("visit_date"), today)
+                    or report_date
+                ),
             )
         )
     return drafts
