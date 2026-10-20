@@ -301,3 +301,12 @@ class Quote(TimestampMixin, Base):
     note: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[int | None] = mapped_column(BigInteger)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class OperatorSetting(TimestampMixin, Base):
+    """Per-operator preferences, keyed by Telegram user id."""
+
+    __tablename__ = "operator_settings"
+
+    telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    weekly_digest: Mapped[bool] = mapped_column(default=True)

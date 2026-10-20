@@ -18,6 +18,7 @@ from telegram.ext import (
 from brains_bot.bot import (
     analysis_handlers,
     chat_handlers,
+    followup_handlers,
     handlers,
     import_handlers,
     outreach_handlers,
@@ -25,6 +26,7 @@ from brains_bot.bot import (
 )
 from brains_bot.config import Settings
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
+from brains_bot.services import followups
 from brains_bot.services.analysis import ClaudeAnalyzer, make_client
 from brains_bot.services.categories import sync_categories
 from brains_bot.services.chat import ChatAssistant
@@ -102,6 +104,9 @@ def build_application(settings: Settings) -> Application:
         "import": import_handlers.import_help,
         "newchat": chat_handlers.new_chat,
         "draft": outreach_handlers.draft,
+        "top": followup_handlers.top,
+        "followups": followup_handlers.followups_command,
+        "reminders": followup_handlers.reminders,
     }
     for name, callback in commands.items():
         application.add_handler(CommandHandler(name, callback, filters=PRIVATE_CHAT))
@@ -125,4 +130,11 @@ def build_application(settings: Settings) -> Application:
         MessageHandler(PRIVATE_CHAT & filters.Document.ALL, import_handlers.workbook_upload)
     )
     application.add_error_handler(handlers.error_handler)
+    if application.job_queue is not None and settings.database_url:
+        application.job_queue.run_daily(
+            followup_handlers.send_weekly_digest,
+            time=followups.DIGEST_TIME,
+            days=followups.DIGEST_DAYS,
+            name="weekly_digest",
+        )
     return application

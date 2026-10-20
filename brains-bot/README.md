@@ -4,8 +4,9 @@ A human-in-the-loop sales intelligence assistant for authorized sales operators,
 private Telegram bot. It never sends messages to customers on its own: it prepares, a human
 reviews and sends.
 
-**Current status:** bot (lookup, analysis, chat, catalog, WhatsApp drafts) and web dashboard
-built, deployed on Render with Mistral. Opportunity ranking and follow-up reminders are next.
+**Current status:** all planned phases built and deployed on Render with Mistral: lookup,
+analysis, chat, catalog, WhatsApp drafts, opportunity ranking, weekly follow-ups and the web
+dashboard.
 
 ## Commands
 
@@ -21,6 +22,9 @@ built, deployed on Render with Mistral. Opportunity ranking and follow-up remind
 | `/categories`      | Authorized     | Product categories and the construction stages when each is best pitched |
 | `/analyze <number> <category> [refresh]` | Authorized | AI assessment: fit, timing, recorded facts, inferred needs, unknowns, next step |
 | `/draft <number> <category>` | Authorized | AI-drafted WhatsApp message to the project's contact; **[Send via WhatsApp]** opens it in your WhatsApp (you press send), **[They replied]** records a reply |
+| `/top [category]`  | Authorized     | Best opportunities to pitch, with the reasons for each score |
+| `/followups`       | Authorized     | This week's summary: who to pitch, sent drafts with no reply, open quotes to chase |
+| `/reminders on\|off` | Authorized   | The weekly summary, sent Mondays at 08:00 Nairobi time (on by default) |
 | Any plain message | Authorized | Chat mode: ask in your own words, e.g. "which projects in Ruiru are at painting stage?" |
 | `/newchat`         | Authorized     | Starts a new conversation (forgets earlier questions) |
 | `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
@@ -163,6 +167,31 @@ who agreed to hear from you. The AI receives the contact's first name, the site 
 stage and catalog options; phone numbers are only used locally to build the link.
 `OUTREACH_COMPANY` and `OUTREACH_SIGNATURE` set the company name and sign-off (default:
 Intelligent Home).
+
+## Opportunity ranking and follow-ups
+
+Every project gets a points score per category, so the ranking can always be explained:
+
+| Signal | Points |
+|--------|--------|
+| Timing for the category | best window +40, coming up +20, retrofit only +15, stage unknown +5 |
+| Age of the stage note | within 4 months +20, within a year +10 |
+| A WhatsApp number on record | +15 |
+| Saved AI analysis | strong fit +25, possible +15, weak -15 |
+| A catalog product fits the recorded stage | +5 |
+| Drafted in the last 30 days | -25 |
+| A lost quote for it | -20 |
+
+Projects too late for a category, or with an open or won quote for it, are left out. `/top`
+shows one row per project (its best category, others listed); `/top audio` ranks one
+category. Each line shows its reasons and the `/draft` command to act on it. The dashboard's
+**Opportunities** page shows the same ranking, and chat answers "who should I pitch this
+week?" from it.
+
+**Follow-ups** are sent drafts with no reply after 5 days and open quotes older than 14 days.
+Every Monday at 08:00 (Nairobi) the bot sends each allowlisted user a summary: the top five
+opportunities, drafts awaiting a reply and quotes to chase. `/reminders off` stops it for you;
+`/followups` shows it any time.
 
 ## Dashboard (web)
 
@@ -356,6 +385,6 @@ tests/
 4. **Verified product catalog and stage-aware suggestions.** Done.
 5. **WhatsApp drafts with manual send (`/draft`).** Done.
 6. **Web dashboard (pipeline, bot performance, revenue) with Telegram login.** Done.
-7. Opportunity ranking and follow-up reminders.
+7. **Opportunity ranking and weekly follow-up reminders (`/top`, `/followups`).** Done.
 
 The private workbook must never be committed. Put it in `data/raw/` locally.
