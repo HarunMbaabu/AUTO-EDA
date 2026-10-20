@@ -168,8 +168,8 @@ Projects that disappear from a newer workbook are flagged, not deleted.
 Paste a site report after `/newsite` (or send `/newsite`, then paste the message):
 
 ```
-/newsite This a project at Runda mumwe Riaka they have finished on the building phase ...
-the contractor is Maina 0721462244. https://maps.app.goo.gl/...
+/newsite This a project at Runda Example Court they have finished on the building phase ...
+the contractor is Mutua 0790003244. https://maps.app.goo.gl/...
 ```
 
 One message can hold **several sites as a numbered list** (`1. ... 2. ...`), after an optional
@@ -208,14 +208,14 @@ A note about a **person, not a site**, goes through `/newsite` too:
 ```
 /newsite Feb 15th 2026
 Met below contractor at Migaa
-Mike Florissant Construction Migaa
-0701 029 545
+Musa Example Construction Migaa
+0790 004 545
 He is a good contact for future projects
 ```
 
-The preview shows `CONTACT: Mike · Contractor · Florissant Construction · Migaa`; Save adds him
+The preview shows `CONTACT: Musa · Contractor · Example Construction · Migaa`; Save adds him
 to the contacts directory with a dated note, and no project is created. Sending a note with the
-same number later adds it to his entry (`UPDATE CONTACT → Mike`). People named on sites get a
+same number later adds it to his entry (`UPDATE CONTACT → Musa`). People named on sites get a
 trade as well (contractor, architect, caretaker, ...), so they appear in the directory too.
 
 Trades: contractor, developer, interior designer, architect, painter / fundi, site manager,

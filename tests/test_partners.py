@@ -18,10 +18,11 @@ from tests.test_chat import FakeTransport, text
 from tests.test_sites import _update
 
 NOTE = """12th Oct 2026 partners we can give jobs to
-1. Pesh Interiors 0714222776, interior design and curtains in Kiambu, about 1,500 per sqm
+1. Jane Decor Interiors 0790001776, interior design and curtains in Kiambu, about 1,500 per sqm
 2. Otieno painter 0722111333, painting labour 250-300 per sqm"""
 ANSWER = {"partners": [
-    {"name": "Pesh", "company": "Pesh Interiors", "area": "Kiambu", "trade": "interior_designer",
+    {"name": "Jane", "company": "Jane Decor Interiors", "area": "Kiambu",
+     "trade": "interior_designer",
      "categories": ["interior_design", "curtains"],
      "rates": [{"category": "interior_design", "job": "interior design", "amount": "1,500",
                 "amount_max": None, "unit": "per sqm"}]},
@@ -54,9 +55,9 @@ def test_extract_reads_work_and_rates_without_sending_numbers(factory):
     transport = FakeTransport(text(json.dumps(ANSWER)))
     pesh, otieno = partners.extract(transport, NOTE, names, date(2026, 10, 20))
     system, user = (m["content"] for m in transport.requests[0]["messages"])
-    assert "0714222776" not in user and "[phone]" in user
+    assert "0790001776" not in user and "[phone]" in user
     assert '"interior_design" (Interior Design)' in system
-    assert pesh.services == ["interior_design", "curtains"] and pesh.phone.e164 == "+254714222776"
+    assert pesh.services == ["interior_design", "curtains"] and pesh.phone.e164 == "+254790001776"
     assert pesh.rates[0].amount == Decimal(1500) and pesh.noted_on == date(2026, 10, 12)
     assert otieno.services == ["painting"]  # an unknown category is dropped
     assert partners.format_rate(otieno.rates[0]) == "painting labour: KES 250–300 per sqm"
@@ -71,7 +72,7 @@ async def test_partner_command_saves_and_lists(factory, context, client_factory=
     update, status = _update(ALLOWED_ID, "/partner " + NOTE)
     await partner_handlers.partner_command(update, context)
     preview = status.edit_text.await_args.args[0]
-    assert "1. PARTNER: Pesh · Pesh Interiors · Kiambu" in preview
+    assert "1. PARTNER: Jane · Jane Decor Interiors · Kiambu" in preview
     assert "Work: Interior Design, Curtains & Blinds" in preview
     assert "Rate: interior design: KES 1,500 per sqm" in preview
     save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
@@ -85,7 +86,7 @@ async def test_partner_command_saves_and_lists(factory, context, client_factory=
         "Saved: 2 new partner(s), 0 updated, 2 rate(s)."
     )
     with session_scope(factory) as s:
-        pesh = s.scalar(select(Contact).where(Contact.name == "Pesh"))
+        pesh = s.scalar(select(Contact).where(Contact.name == "Jane"))
         assert pesh.partner and pesh.trade == "interior_designer"
         assert len(s.scalars(select(PartnerRate)).all()) == 2
 

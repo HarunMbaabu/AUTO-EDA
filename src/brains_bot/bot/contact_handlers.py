@@ -58,8 +58,8 @@ def _usage(counts: list[tuple[str, int]]) -> str:
         "Examples: /contacts contractor · /contacts interior designer Karen · "
         "/contacts Migaa\n\n"
         f"Known so far: {known}.\n"
-        "Add people by pasting a note with /newsite, e.g. 'Met contractor Mike, "
-        "Florissant Construction, Migaa 07..., good contact for future projects'."
+        "Add people by pasting a note with /newsite, e.g. 'Met contractor Musa, "
+        "Example Construction, Migaa 07..., good contact for future projects'."
     )
 
 

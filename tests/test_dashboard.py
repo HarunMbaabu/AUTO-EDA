@@ -142,20 +142,20 @@ def test_contacts_page_filters_by_trade(client, factory):
     from brains_bot.services import contacts
 
     with session_scope(factory) as s:
-        contacts.save_contact(s, "Mike", normalize_phone("0701 029 545"), "contractor",
-                              "Florissant Construction", "Migaa", "Good contact",
+        contacts.save_contact(s, "Musa", normalize_phone("0790 004 545"), "contractor",
+                              "Example Construction", "Migaa", "Good contact",
                               date(2026, 2, 15))  # fmt: skip
-        contacts.save_contact(s, "Pesh", normalize_phone("0714222776"), "interior_designer",
-                              "Pesh Interiors", "Golden palm", "Call back 0714222776",
+        contacts.save_contact(s, "Jane", normalize_phone("0790001776"), "interior_designer",
+                              "Jane Decor Interiors", "Golden palm", "Call back 0790001776",
                               date(2026, 2, 4))  # fmt: skip
     _log_in(client)
     page = client.get("/contacts").text
-    assert "Florissant Construction" in page and "Pesh Interiors" in page
-    assert "+254 7XX XXX 545" in page and "701029545" not in page
-    assert "0714222776" not in page  # numbers inside notes are masked too
+    assert "Example Construction" in page and "Jane Decor Interiors" in page
+    assert "+254 7XX XXX 545" in page and "790004545" not in page
+    assert "0790001776" not in page  # numbers inside notes are masked too
     assert "Called on 04 Feb 2026" in page and "Noted on 15 Feb 2026" in page
     only = client.get("/contacts", params={"trade": "contractor", "q": "Migaa"}).text
-    assert "Florissant Construction" in only and "Pesh Interiors" not in only
+    assert "Example Construction" in only and "Jane Decor Interiors" not in only
 
 
 def test_partners_page(client, factory):
@@ -166,14 +166,14 @@ def test_partners_page(client, factory):
     with session_scope(factory) as s:
         sync_categories(s)
         draft = partners.PartnerDraft(
-            message="Pesh", name="Pesh", company="Pesh Interiors", area="Kiambu",
+            message="Jane", name="Jane", company="Jane Decor Interiors", area="Kiambu",
             trade="interior_designer", services=["interior_design"],
             rates=[partners.RateDraft("interior_design", "design", 1500, None, "per sqm")],
-            note=None, phone=normalize_phone("0714222776"),
+            note=None, phone=normalize_phone("0790001776"),
         )  # fmt: skip
         partners.save(s, draft, date(2026, 10, 12))
     _log_in(client)
     page = client.get("/partners", params={"category": "Finishes & Interiors"}).text
-    assert "Pesh Interiors" in page and "design: KES 1,500 per sqm" in page
-    assert "714222776" not in page
-    assert "Pesh Interiors" not in client.get("/partners", params={"category": "audio"}).text
+    assert "Jane Decor Interiors" in page and "design: KES 1,500 per sqm" in page
+    assert "790001776" not in page
+    assert "Jane Decor Interiors" not in client.get("/partners", params={"category": "audio"}).text

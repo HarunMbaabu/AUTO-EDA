@@ -19,13 +19,13 @@ from tests.test_sites import _update
 MIKE = (
     "Feb 15th 2026\n"
     "Met below contractor at Migaa\n"
-    "Mike Florissant Construction Migaa\n"
-    "0701 029 545\n"
+    "Musa Example Construction Migaa\n"
+    "0790 004 545\n"
     "He is a good contact for future projects"
 )
 MIKE_ANSWER = {"kind": "contact", "site_name": None, "area": "Migaa", "city": None,
-               "contact_name": "Mike", "contact_role": "contractor", "trade": "contractor",
-               "company": "Florissant Construction"}  # fmt: skip
+               "contact_name": "Musa", "contact_role": "contractor", "trade": "contractor",
+               "company": "Example Construction"}  # fmt: skip
 
 
 def _mike():
@@ -38,17 +38,17 @@ def _mike():
 def test_a_contact_without_a_site_goes_to_the_directory(factory):
     draft = _mike()
     assert (draft.kind, draft.trade, draft.company, draft.area) == (
-        "contact", "contractor", "Florissant Construction", "Migaa")  # fmt: skip
-    assert draft.phone.e164 == "+254701029545" and draft.visit_date == date(2026, 2, 15)
+        "contact", "contractor", "Example Construction", "Migaa")  # fmt: skip
+    assert draft.phone.e164 == "+254790004545" and draft.visit_date == date(2026, 2, 15)
     with session_scope(factory) as s:
         sites.match_existing(s, [draft])
         assert draft.existing_contact_id is None
         saved = sites.save(s, draft, date(2026, 10, 20))
-        assert saved.kind == "new_contact" and saved.name == "Mike"
+        assert saved.kind == "new_contact" and saved.name == "Musa"
         assert s.scalars(select(Project)).all() == []  # no site was made up
         mike = s.get(Contact, saved.id)
         assert (mike.trade, mike.company, mike.area) == (
-            "contractor", "Florissant Construction", "Migaa")  # fmt: skip
+            "contractor", "Example Construction", "Migaa")  # fmt: skip
         note = s.scalar(select(ContactNote))
         assert note.observed_date == date(2026, 2, 15) and "future projects" in note.text
 
@@ -56,13 +56,13 @@ def test_a_contact_without_a_site_goes_to_the_directory(factory):
     again = _mike()
     with session_scope(factory) as s:
         sites.match_existing(s, [again])
-        assert again.existing_contact_name == "Mike"
+        assert again.existing_contact_name == "Musa"
         assert sites.save(s, again, date(2026, 10, 20)).kind == "contact_note"
         assert len(s.scalars(select(Contact)).all()) == 1
         assert len(s.scalars(select(ContactNote)).all()) == 2
 
         entries, total = contacts.directory(s, "contractor", "migaa")
-        assert total == 1 and entries[0].contact.name == "Mike"
+        assert total == 1 and entries[0].contact.name == "Musa"
         assert contacts.directory(s, "interior_designer")[1] == 0
         assert contacts.directory(s, None, "Karen")[1] == 0
         assert contacts.trade_counts(s) == [("contractor", 1)]
@@ -70,7 +70,7 @@ def test_a_contact_without_a_site_goes_to_the_directory(factory):
         found = ProjectTools(s, ALLOWED_ID, date(2026, 10, 20)).run(
             "find_contacts", {"trade": "contractor", "text": "Migaa"}
         )
-        assert found["total"] == 1 and found["contacts"][0]["company"] == "Florissant Construction"
+        assert found["total"] == 1 and found["contacts"][0]["company"] == "Example Construction"
         assert "0701" not in json.dumps(found) and "+254" not in json.dumps(found)
 
 
@@ -82,7 +82,7 @@ def test_site_contacts_get_a_trade(factory):
     with session_scope(factory) as s:
         sites.save(s, draft, date(2026, 10, 20))
         (entry,), _ = contacts.directory(s, "contractor", "Runda")
-        assert entry.contact.name == "Maina" and entry.projects
+        assert entry.contact.name == "Mutua" and entry.projects
 
 
 @pytest.mark.parametrize(
@@ -108,7 +108,7 @@ async def test_newsite_contact_then_contacts_command(factory, context):
     await site_handlers.newsite(update, context)
     preview = status.edit_text.await_args.args[0]
     assert preview.startswith("New contact: please check")
-    assert "CONTACT: Mike · Contractor · Florissant Construction · Migaa" in preview
+    assert "CONTACT: Musa · Contractor · Example Construction · Migaa" in preview
     assert "Date: 15 Feb 2026 (from the message)" in preview
     save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
     query = SimpleNamespace(
@@ -125,7 +125,7 @@ async def test_newsite_contact_then_contacts_command(factory, context):
     await contact_handlers.contacts_command(update, context)
     reply = reply_of(update)
     assert "Contractors matching 'Migaa' (1)" in reply
-    assert "Mike · Contractor · Florissant Construction · Migaa" in reply
+    assert "Musa · Contractor · Example Construction · Migaa" in reply
     assert "+254 7XX XXX 545" in reply and "Met on 15 Feb 2026: " in reply
 
     update = make_update(ALLOWED_ID)
@@ -153,8 +153,8 @@ def test_workbook_people_get_a_trade_from_their_column(factory, tmp_path):
 
 
 def test_notes_shown_with_numbers_masked():
-    shown = contacts.note_for_display("Call Mike 0701 029 545 tomorrow")
-    assert shown == "Call Mike +254 7XX XXX 545 tomorrow"
+    shown = contacts.note_for_display("Call Musa 0790 004 545 tomorrow")
+    assert shown == "Call Musa +254 7XX XXX 545 tomorrow"
 
 
 @pytest.mark.parametrize(
