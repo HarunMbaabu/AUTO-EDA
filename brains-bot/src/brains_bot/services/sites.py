@@ -1,9 +1,11 @@
-"""New projects from a pasted WhatsApp site report (/newsite).
+"""New projects and follow-ups from a pasted WhatsApp site report (/newsite).
 
-The phone number and map link are found locally. The AI only sees the message with contact
-details removed, and returns the site name, area, city and the contact's name and role. The
-operator checks the result before anything is saved. The full original message is kept as the
-project's first note, so the construction stage is detected from it like any other note.
+A report can describe one site or a numbered list of sites ("1. ... 2. ..."), optionally after
+an intro line such as "today I'm mapping Riverview, Golden Palm". Each site's phone numbers and
+map link are found locally. The AI sees only the text with contact details removed and returns,
+per site, the site name, area, city and the contact's name and role, in one call. A site whose
+phone number already belongs to a project is treated as a follow-up: its text becomes a new note
+on that project instead of a duplicate project. The operator checks everything before saving.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from brains_bot.database.models import (
@@ -34,35 +36,43 @@ log = logging.getLogger(__name__)
 SOURCE_PREFIX = "tg:"  # source_key of projects added from Telegram, never from the workbook
 NOTE_FIELD = "WhatsApp report"
 ROLES = ("contact_person", "owner", "contractor", "architect")
-MAX_MESSAGE_CHARS = 3000
+MAX_MESSAGE_CHARS = 6000
+MAX_SITES = 20
 _MAP_LINK = re.compile(
     r"https?://(?:maps\.app\.goo\.gl|goo\.gl/maps|(?:www\.)?google\.[a-z.]+/maps)\S*", re.I
 )
+_ITEM_START = re.compile(r"^\s*(\d{1,2})\s*[.)]\s+", re.M)
 
 EXTRACT_PROMPT = """\
-You read a short site-visit report that a sales person in Kenya pasted from WhatsApp, about a \
-building project. Reply with one JSON object only, with exactly these keys:
-- "site_name": the project's name if one is stated; otherwise "<person> project" using the \
-main person named, or "<area> site"; never invent other names
-- "area": the estate, road or neighbourhood, or null
-- "city": the town or city if stated or obvious from a well-known area (e.g. Runda -> Nairobi), \
-or null
-- "contact_name": the person to talk to, as written (keep titles like Mr., Eng.), or null
+A sales person in Kenya pasted a WhatsApp report about building sites they visited. You get \
+JSON with "context" (any intro text) and "items" (one entry per site). Reply with one JSON \
+object {{"sites": [...]}} holding exactly {count} objects, one per item, in the same order, \
+each with exactly these keys:
+- "site_name": the name the item starts with or states (e.g. "Dennis project", "Pesh Villa"); \
+if the item starts with only a person's name, "<that name> project"; never invent names
+- "area": the estate, road or neighbourhood stated in the item (e.g. "Riverview 79"), or null
+- "city": the town if stated or obvious from a well-known area (e.g. Runda -> Nairobi), or null
+- "contact_name": the person to talk to, as written (keep titles), or null if none is named
 - "contact_role": one of "contractor", "owner", "architect", "contact_person"
-Contact details were removed and appear as [phone] or [email]. Use only what the message says.\
+- "role_description": the person's role in a few words as stated (e.g. "paint contractor", \
+"caretaker", "interior designer"), or null
+Contact details were removed and appear as [phone] or [email]. Use only what the text says.\
 """
 
 
 @dataclass
 class SiteDraft:
-    message: str
+    message: str  # this site's own text, saved as its note
     site_name: str
     area: str | None
     city: str | None
     contact_name: str | None
     contact_role: str
+    role_description: str | None
     phone: n.PhoneResult
     map_url: str | None
+    existing_project_id: int | None = None  # set when this is a follow-up on a known project
+    existing_name: str | None = None
 
 
 def _clean(value: Any, limit: int = 120) -> str | None:
@@ -73,47 +83,100 @@ def _clean(value: Any, limit: int = 120) -> str | None:
 
 
 def find_phones(text: str) -> n.PhoneResult:
-    """Every phone number in the message, normalised like the workbook import does."""
+    """Every phone number in the text, normalised like the workbook import does."""
     found = [m.group(0) for m in n.PHONE_IN_TEXT.finditer(text)]
     return n.normalize_phone(" / ".join(found)) if found else n.PhoneResult(raw=None)
 
 
-def extract(transport: Any, message: str) -> SiteDraft:
+def split_report(message: str) -> tuple[str, list[str]]:
+    """(intro, one text per site). A numbered list of two or more entries is split; anything
+    else is a single site with no intro."""
+    starts = [m.start() for m in _ITEM_START.finditer(message)]
+    if len(starts) < 2:
+        return "", [message.strip()]
+    intro = message[: starts[0]].strip()
+    items = [message[a:b].strip() for a, b in zip(starts, [*starts[1:], len(message)], strict=True)]
+    return intro, [_ITEM_START.sub("", item, count=1).strip() for item in items][:MAX_SITES]
+
+
+def _for_ai(text: str) -> str:
+    return n.redact_contact_details(_MAP_LINK.sub("[map link]", text))
+
+
+def extract(transport: Any, message: str) -> list[SiteDraft]:
     message = message.strip()[:MAX_MESSAGE_CHARS]
-    map_match = _MAP_LINK.search(message)
-    phone = find_phones(_MAP_LINK.sub(" ", message))
-    for_ai = n.redact_contact_details(_MAP_LINK.sub("[map link]", message))
+    intro, items = split_report(message)
+    payload = {"context": _for_ai(intro) or None, "items": [_for_ai(item) for item in items]}
     body = {
         "model": transport.model,
         "messages": [
-            {"role": "system", "content": EXTRACT_PROMPT},
-            {"role": "user", "content": for_ai},
+            {"role": "system", "content": EXTRACT_PROMPT.format(count=len(items))},
+            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ],
         "response_format": {"type": "json_object"},
-        "max_tokens": 300,
+        "max_tokens": 200 + 150 * len(items),
         "stream": False,
     }
     data = transport._send("POST", "/chat/completions", json=body)
     content = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "{}"
     try:
-        fields = json.loads(content)
+        answer = json.loads(content)
     except json.JSONDecodeError as exc:
         raise AnalysisError("the AI's answer could not be read; please try again") from exc
-    if not isinstance(fields, dict):
-        fields = {}
-    log.info("site extracted", extra={"event": "site_extract", "model": data.get("model")})
-    area = _clean(fields.get("area"))
-    role = fields.get("contact_role") if fields.get("contact_role") in ROLES else "contact_person"
-    return SiteDraft(
-        message=message,
-        site_name=_clean(fields.get("site_name")) or (f"{area} site" if area else "New site"),
-        area=area,
-        city=_clean(fields.get("city"), 60),
-        contact_name=_clean(fields.get("contact_name")),
-        contact_role=role,
-        phone=phone,
-        map_url=map_match.group(0) if map_match else None,
+    found = answer.get("sites") if isinstance(answer, dict) else None
+    if not isinstance(found, list):  # a single object is fine for a single site
+        found = [answer] if isinstance(answer, dict) and len(items) == 1 else []
+    log.info(
+        "sites extracted",
+        extra={"event": "site_extract", "model": data.get("model"), "command": str(len(items))},
     )
+
+    drafts = []
+    for i, item in enumerate(items):
+        fields = found[i] if i < len(found) and isinstance(found[i], dict) else {}
+        area = _clean(fields.get("area"))
+        role = fields.get("contact_role")
+        map_match = _MAP_LINK.search(item)
+        drafts.append(
+            SiteDraft(
+                message=item,
+                site_name=_clean(fields.get("site_name"))
+                or (f"{area} site" if area else "New site"),
+                area=area,
+                city=_clean(fields.get("city"), 60),
+                contact_name=_clean(fields.get("contact_name")),
+                contact_role=role if role in ROLES else "contact_person",
+                role_description=_clean(fields.get("role_description"), 60),
+                phone=find_phones(_MAP_LINK.sub(" ", item)),
+                map_url=map_match.group(0) if map_match else None,
+            )
+        )
+    return drafts
+
+
+def match_existing(session: Session, drafts: list[SiteDraft]) -> None:
+    """Mark drafts whose phone number already belongs to a project as follow-ups on it."""
+    for draft in drafts:
+        if not draft.phone.numbers:
+            continue
+        found = session.execute(
+            select(Project.id, Project.name)
+            .join(ProjectContact, ProjectContact.project_id == Project.id)
+            .join(Contact, Contact.id == ProjectContact.contact_id)
+            .where(
+                or_(
+                    Contact.phone_e164.in_(draft.phone.numbers),
+                    *[
+                        Contact.phone_candidates.contains([number])
+                        for number in draft.phone.numbers
+                    ],
+                )
+            )
+            .order_by(Project.site_visit_date.desc().nulls_last(), Project.id.desc())
+            .limit(1)
+        ).first()
+        if found is not None:
+            draft.existing_project_id, draft.existing_name = found
 
 
 def _contact(session: Session, draft: SiteDraft, project_key: str) -> Contact:
@@ -146,7 +209,25 @@ def _contact(session: Session, draft: SiteDraft, project_key: str) -> Contact:
     return contact
 
 
+def _note(draft: SiteDraft) -> str:
+    who = ", ".join(x for x in (draft.contact_name, draft.role_description) if x)
+    return draft.message + (f"\n(Contact: {who})" if who and who not in draft.message else "")
+
+
 def save(session: Session, draft: SiteDraft, today: date) -> Project:
+    """A follow-up adds a dated note to its project; anything else becomes a new project."""
+    if draft.existing_project_id is not None:
+        project = session.get(Project, draft.existing_project_id)
+        if project is not None:
+            session.add(
+                ProjectNote(
+                    project_id=project.id, field=NOTE_FIELD, text=_note(draft), observed_date=today
+                )
+            )
+            if draft.map_url and not project.google_location_url:
+                project.google_location_url = draft.map_url
+            session.flush()
+            return project
     key = f"{SOURCE_PREFIX}{uuid.uuid4().hex[:12]}"
     project = Project(
         source_key=key,
@@ -166,9 +247,7 @@ def save(session: Session, draft: SiteDraft, today: date) -> Project:
         for role in sorted(roles):
             session.add(ProjectContact(project_id=project.id, contact_id=contact.id, role=role))
     session.add(
-        ProjectNote(
-            project_id=project.id, field=NOTE_FIELD, text=draft.message, observed_date=today
-        )
+        ProjectNote(project_id=project.id, field=NOTE_FIELD, text=_note(draft), observed_date=today)
     )
     session.flush()
     return project

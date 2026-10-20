@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from brains_bot.bot.formatting import MAX_MESSAGE, truncate
 from brains_bot.bot.handlers import (
     NOT_AUTHORIZED,
     _is_authorized,
@@ -32,39 +33,56 @@ AWAITING = "awaiting_site"
 PENDING = "pending_sites"
 NOT_AVAILABLE = "Adding sites needs MISTRAL_API_KEY or DEEPSEEK_API_KEY to be set."
 ASK = (
-    "Paste the WhatsApp message about the site now (one message). "
+    "Paste the WhatsApp message now: one site, or a numbered list of sites (1. ... 2. ...). "
     "I'll show you what I understood before saving anything."
 )
 ROLE_LABELS = {"contact_person": "contact", "owner": "owner", "contractor": "contractor",
                "architect": "architect"}  # fmt: skip
 
 
-def _preview(draft: sites.SiteDraft) -> str:
-    numbers = ", ".join(mask_phone(x) for x in draft.phone.numbers) or "none found"
-    lines = [
-        "New site: please check",
-        f"Site: {draft.site_name}",
-        f"Area: {draft.area or '—'}" + (f", {draft.city}" if draft.city else ""),
-        f"Contact: {draft.contact_name or '—'} ({ROLE_LABELS[draft.contact_role]})",
-        f"WhatsApp number: {numbers}",
-        f"Map: {'yes' if draft.map_url else 'no link'}",
-        f"Visit date: {date.today():%d %b %Y}",
-        "",
-        "The whole message is saved as the first note. If something is wrong, tap Cancel and "
-        "send /newsite again with the message corrected.",
+def _site_lines(n: int | None, draft: sites.SiteDraft) -> list[str]:
+    numbers = ", ".join(mask_phone(x) for x in draft.phone.numbers) or "no number"
+    role = draft.role_description or ROLE_LABELS[draft.contact_role]
+    prefix = f"{n}. " if n is not None else ""
+    if draft.existing_project_id is not None:
+        head = f"{prefix}FOLLOW-UP → #{draft.existing_project_id} {draft.existing_name}"
+        return [head, f"   adds this as a new note · {numbers}"]
+    place = ", ".join(x for x in (draft.area, draft.city) if x) or "area not stated"
+    return [
+        f"{prefix}NEW: {draft.site_name} · {place}",
+        f"   {draft.contact_name or 'no name'} ({role}) · {numbers}"
+        + (" · map" if draft.map_url else ""),
     ]
-    return "\n".join(lines)
+
+
+def _preview(drafts: list[sites.SiteDraft]) -> str:
+    many = len(drafts) > 1
+    lines = [f"{len(drafts)} sites: please check" if many else "New site: please check", ""]
+    for i, draft in enumerate(drafts, start=1):
+        lines += _site_lines(i if many else None, draft)
+    lines += [
+        "",
+        f"Visit date: {date.today():%d %b %Y}. Each site's own text is saved as its note. "
+        "Follow-ups are matched by phone number. If something is wrong, tap Cancel and send "
+        "/newsite again with the message corrected.",
+    ]
+    return truncate("\n".join(lines), MAX_MESSAGE)
 
 
 async def handle_report(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
-    """Extract a site from the pasted text and show it with Save / Cancel."""
-    transport = context.bot_data.get("drafter")
-    if transport is None:
+    """Extract the site(s) from the pasted text and show them with Save / Cancel."""
+    drafter = context.bot_data.get("drafter")
+    if drafter is None:
         await update.effective_message.reply_text(NOT_AVAILABLE)
         return
     status = await update.effective_message.reply_text("Reading the site details…")
     try:
-        draft = await asyncio.to_thread(sites.extract, transport.transport, text)
+        drafts = await asyncio.to_thread(sites.extract, drafter.transport, text)
+
+        def match(session: Session) -> None:
+            sites.match_existing(session, drafts)
+
+        await _with_session(context, match)
     except AnalysisError as exc:
         await status.edit_text(f"I couldn't read that: {exc}")
         return
@@ -73,12 +91,13 @@ async def handle_report(update: Update, context: ContextTypes.DEFAULT_TYPE, text
         await status.edit_text("Something went wrong reading that. Please try again.")
         return
     token = secrets.token_urlsafe(9)
-    context.user_data.setdefault(PENDING, {})[token] = draft
+    context.user_data.setdefault(PENDING, {})[token] = drafts
+    save_label = f"✅ Save all {len(drafts)}" if len(drafts) > 1 else "✅ Save"
     buttons = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("✅ Save", callback_data=f"site:save:{token}"),
+        [[InlineKeyboardButton(save_label, callback_data=f"site:save:{token}"),
           InlineKeyboardButton("✖ Cancel", callback_data=f"site:cancel:{token}")]]
     )  # fmt: skip
-    await status.edit_text(_preview(draft), reply_markup=buttons)
+    await status.edit_text(_preview(drafts), reply_markup=buttons)
 
 
 @restricted("newsite")
@@ -107,8 +126,8 @@ async def site_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.answer()
         return
     action, token = match.groups()
-    draft = pending.pop(token, None)
-    if draft is None:
+    drafts = pending.pop(token, None)
+    if drafts is None:
         await query.answer("This preview has expired. Send /newsite again.", show_alert=True)
         return
     if action == "cancel":
@@ -117,20 +136,29 @@ async def site_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     actor = _user_id(update)
 
-    def work(session: Session) -> tuple[int, str]:
-        project = sites.save(session, draft, date.today())
-        svc.record_audit(session, actor, "site_created", target=f"project:{project.id}")
-        return project.id, project.name
+    def work(session: Session) -> list[tuple[int, str, bool]]:
+        saved = []
+        for draft in drafts:
+            follow_up = draft.existing_project_id is not None
+            project = sites.save(session, draft, date.today())
+            action_name = "site_followup" if follow_up else "site_created"
+            svc.record_audit(session, actor, action_name, target=f"project:{project.id}")
+            saved.append((project.id, project.name, follow_up))
+        return saved
 
     try:
-        project_id, name = await _with_session(context, work)
+        saved = await _with_session(context, work)
     except Exception:
-        log.exception("saving site failed", extra={"event": "db_error"})
-        pending[token] = draft  # let them try Save again
+        log.exception("saving sites failed", extra={"event": "db_error"})
+        pending[token] = drafts  # nothing was saved (one transaction); let them try again
         await query.answer(DB_ERROR[:190], show_alert=True)
         return
     await query.answer("Saved.")
-    await query.edit_message_text(
-        f"Saved as project #{project_id} {name}.\n"
-        f"/project {project_id} · /analyze {project_id} audio · /draft {project_id} audio"
-    )
+    new = [s for s in saved if not s[2]]
+    lines = [f"Saved: {len(new)} new project(s), {len(saved) - len(new)} follow-up note(s)."]
+    for project_id, name, follow_up in saved:
+        kind = "note added to" if follow_up else "new"
+        lines.append(f"- {kind} #{project_id} {name}")
+    first = saved[0][0]
+    lines.append(f"Next: /project {first} · /analyze {first} audio · /draft {first} audio · /top")
+    await query.edit_message_text(truncate("\n".join(lines), MAX_MESSAGE))
