@@ -57,6 +57,8 @@ def _summary(stats: ImportStats) -> str:
     lines.append(f"- Contacts created: {stats.contacts}")
     if stats.stale:
         lines.append(f"- No longer in the workbook (flagged, not deleted): {len(stats.stale)}")
+    if stats.merged:
+        lines.append(f"- Skipped, merged earlier as repeats (/merge): {stats.merged}")
     return "\n".join(lines)
 
 

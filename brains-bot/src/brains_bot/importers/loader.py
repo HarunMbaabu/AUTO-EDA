@@ -19,6 +19,7 @@ from brains_bot.database.models import (
     ImportBatch,
     MarketingPermission,
     Project,
+    ProjectAlias,
     ProjectContact,
     ProjectNote,
     SalesAssignment,
@@ -66,6 +67,7 @@ class ImportStats:
     conflicts: list[str] = field(default_factory=list)
     date_issues: list[str] = field(default_factory=list)
     projects: int = 0
+    merged: int = 0  # rows of projects merged into another as repeats
     flagged: list[tuple[str, str, list[str]]] = field(default_factory=list)
     contacts: int = 0
     dealer_shops: int = 0
@@ -179,8 +181,18 @@ class Loader:
             record.match_method = next(lk.method for lk in draft.links if lk.row is row)
 
         # Child rows are derived entirely from the workbook, so rebuild them on every import.
-        self.session.execute(delete(ProjectContact).where(ProjectContact.project_id == project.id))
-        self.session.execute(delete(ProjectNote).where(ProjectNote.project_id == project.id))
+        # Notes and people added from Telegram (follow-ups, merged repeats) are not the
+        # workbook's: they stay.
+        self.session.execute(
+            delete(ProjectContact).where(
+                ProjectContact.project_id == project.id, ProjectContact.manual.is_(False)
+            )
+        )
+        self.session.execute(
+            delete(ProjectNote).where(
+                ProjectNote.project_id == project.id, ProjectNote.source_record_id.is_not(None)
+            )
+        )
         self.session.execute(
             delete(SalesAssignment).where(SalesAssignment.project_id == project.id)
         )
@@ -245,6 +257,7 @@ class Loader:
 
     def _add_contacts(self, project: Project, draft: ProjectDraft) -> None:
         rows = draft.rows()
+        manual = self._manual_links(project.id)
         for role, column in ROLE_COLUMNS.items():
             value, row = _first(rows, column)
             name = n.meaningful(value)
@@ -261,10 +274,20 @@ class Loader:
                     details, _ = _first(same, "Contact Details")
                 phone = n.normalize_phone(details)
             contact = self._upsert_contact(name, role, phone, draft.source_key)
-            self.session.add(
-                ProjectContact(project_id=project.id, contact_id=contact.id, role=role)
-            )
+            link = (project.id, contact.id, role)
+            if link not in manual:
+                self.session.add(
+                    ProjectContact(project_id=project.id, contact_id=contact.id, role=role)
+                )
         self.session.flush()
+
+    def _manual_links(self, project_id: int) -> set[tuple[int, int, str]]:
+        rows = self.session.execute(
+            select(ProjectContact.project_id, ProjectContact.contact_id, ProjectContact.role).where(
+                ProjectContact.project_id == project_id, ProjectContact.manual.is_(True)
+            )
+        )
+        return {tuple(r) for r in rows}
 
     def _upsert_contact(
         self, name: str, role: str, phone: n.PhoneResult | None, project_key: str
@@ -458,7 +481,11 @@ def run_import(
 
     loader = Loader(session, stats, batch, aliases, audio_status_mode)
     loader.add_source_records(workbook)
+    merged = set(session.scalars(select(ProjectAlias.source_key)))
     for draft in result.projects:
+        if draft.source_key in merged:  # merged into another project as a repeat
+            stats.merged += 1
+            continue
         loader.upsert_project(draft)
     loader.load_dealer_shops(workbook)
     _flag_stale_projects(session, stats, batch)
@@ -472,6 +499,7 @@ def run_import(
         "contacts_created": stats.contacts,
         "dealer_shops": stats.dealer_shops,
         "stale_projects": len(stats.stale),
+        "merged_projects": stats.merged,
         "audio_status_mode": audio_status_mode,
     }
     session.flush()

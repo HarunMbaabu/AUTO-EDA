@@ -6,6 +6,7 @@ import asyncio
 import logging
 import re
 import secrets
+from dataclasses import replace
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -28,7 +29,7 @@ from brains_bot.services.analysis import AnalysisError
 
 log = logging.getLogger(__name__)
 
-SITE_CALLBACK = re.compile(r"^site:(save|cancel):([A-Za-z0-9_-]{6,20})$")
+SITE_CALLBACK = re.compile(r"^site:(save|new|cancel):([A-Za-z0-9_-]{6,20})$")
 AWAITING = "awaiting_site"
 PENDING = "pending_sites"
 NOT_AVAILABLE = "Adding sites needs MISTRAL_API_KEY or DEEPSEEK_API_KEY to be set."
@@ -65,6 +66,12 @@ def _site_lines(n: int | None, draft: sites.SiteDraft) -> list[str]:
     if draft.existing_project_id is not None:
         head = f"{prefix}FOLLOW-UP → #{draft.existing_project_id} {draft.existing_name}"
         return [head, f"   adds this as a new note · {numbers}"]
+    if draft.possible_project_id is not None:
+        head = f"{prefix}POSSIBLE REPEAT → #{draft.possible_project_id} {draft.possible_name}"
+        return [
+            head,
+            f"   same name ({draft.contact_name}) in the same area, different number · {numbers}",
+        ]
     place = ", ".join(x for x in (draft.area, draft.city) if x) or "area not stated"
     if draft.visit_date:
         place += f" · visited {draft.visit_date:%d %b}"
@@ -97,8 +104,14 @@ def _preview(drafts: list[sites.SiteDraft]) -> str:
         "",
         when,
         "Each entry's own text is saved as its note. "
-        "Follow-ups and known contacts are matched by phone number. "
-        "If something is wrong, tap Cancel and send /newsite again with the message corrected.",
+        "Follow-ups and known contacts are matched by phone number"
+        + (
+            "; a POSSIBLE REPEAT is saved as a follow-up with its new number unless you tap "
+            "'Save repeats as new'. "
+            if any(d.possible_project_id for d in drafts)
+            else ". "
+        )
+        + "If something is wrong, tap Cancel and send /newsite again with the message corrected.",
     ]
     return truncate("\n".join(lines), MAX_MESSAGE)
 
@@ -127,10 +140,15 @@ async def handle_report(update: Update, context: ContextTypes.DEFAULT_TYPE, text
     token = secrets.token_urlsafe(9)
     context.user_data.setdefault(PENDING, {})[token] = drafts
     save_label = f"✅ Save all {len(drafts)}" if len(drafts) > 1 else "✅ Save"
-    buttons = InlineKeyboardMarkup(
-        [[InlineKeyboardButton(save_label, callback_data=f"site:save:{token}"),
-          InlineKeyboardButton("✖ Cancel", callback_data=f"site:cancel:{token}")]]
-    )  # fmt: skip
+    cancel = InlineKeyboardButton("✖ Cancel", callback_data=f"site:cancel:{token}")
+    if any(d.possible_project_id for d in drafts):
+        rows = [[InlineKeyboardButton(f"{save_label} (repeats as follow-ups)",
+                                      callback_data=f"site:save:{token}")],
+                [InlineKeyboardButton("➕ Save repeats as new", callback_data=f"site:new:{token}"),
+                 cancel]]  # fmt: skip
+    else:
+        rows = [[InlineKeyboardButton(save_label, callback_data=f"site:save:{token}"), cancel]]
+    buttons = InlineKeyboardMarkup(rows)
     await status.edit_text(_preview(drafts), reply_markup=buttons)
 
 
@@ -169,10 +187,17 @@ async def site_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.edit_message_text("Cancelled: nothing was saved.")
         return
     actor = _user_id(update)
+    # "Save" makes a possible repeat a follow-up on that project; "Save repeats as new" does not.
+    chosen = [
+        replace(d, existing_project_id=d.possible_project_id, existing_name=d.possible_name)
+        if d.possible_project_id is not None and action == "save"
+        else d
+        for d in drafts
+    ]
 
     def work(session: Session) -> list[sites.Saved]:
         saved = []
-        for draft in drafts:
+        for draft in chosen:
             result = sites.save(session, draft, date.today(), actor)
             target = "contact" if result.kind in CONTACT_KINDS else "project"
             svc.record_audit(session, actor, AUDIT[result.kind], target=f"{target}:{result.id}")

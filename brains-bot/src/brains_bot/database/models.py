@@ -17,6 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy import false as sa_false
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -124,6 +125,9 @@ class ProjectContact(Base):
     contact_id: Mapped[int] = mapped_column(ForeignKey("contacts.id", ondelete="CASCADE"))
     # owner | contractor | architect | contact_person | company
     role: Mapped[str] = mapped_column(String(30))
+    # Linked by the bot (a follow-up with a new number, a merge), not by the workbook: kept when
+    # a new workbook import rebuilds the project's people.
+    manual: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
 
     project: Mapped[Project] = relationship(back_populates="contacts")
     contact: Mapped[Contact] = relationship()
@@ -329,3 +333,17 @@ class ContactNote(Base):
     observed_date: Mapped[date | None] = mapped_column(Date)
     created_by: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProjectAlias(Base):
+    """A workbook project merged into another as a repeat: later imports skip its rows."""
+
+    __tablename__ = "project_aliases"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_key: Mapped[str] = mapped_column(String(120), unique=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    merged_by: Mapped[int | None] = mapped_column(BigInteger)
+    merged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
