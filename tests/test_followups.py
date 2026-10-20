@@ -159,3 +159,28 @@ def test_dashboard_opportunities_page(client, factory, tmp_path):  # noqa: F811
     assert "/draft " in page
     overview = client.get("/").text
     assert "Top opportunities" in overview and "Follow-ups" in overview
+
+
+async def test_ready_to_send_drafts_are_pushed(factory, tmp_path, context):
+    from brains_bot.services.outreach import Drafter
+    from tests.test_chat import FakeTransport, text
+
+    _seed(factory, tmp_path)
+    context.bot_data["db"] = factory
+    context.bot_data["drafter"] = Drafter(
+        FakeTransport(*[text(f"Hello, message {i}") for i in range(5)])
+    )
+    update = make_update(ALLOWED_ID)
+    status = SimpleNamespace(edit_text=AsyncMock())
+    update.effective_message.reply_text.return_value = status
+    context.args = ["drafts"]
+    await followup_handlers.followups_command(update, context)
+    assert status.edit_text.await_args.args[0].endswith("check each, then tap Send.")
+    pushed = update.effective_message.reply_text.await_args_list[1:]
+    assert pushed and pushed[0].args[0].startswith("Draft for #")
+    assert pushed[0].kwargs["reply_markup"].inline_keyboard[0][0].text.startswith("📤 Send")
+
+    context.bot = SimpleNamespace(send_message=AsyncMock())
+    await followup_handlers.send_weekly_digest(context)
+    sent = [c.args[1] for c in context.bot.send_message.await_args_list]
+    assert "your follow-ups" in sent[0] and sent[1].startswith("Draft for #")

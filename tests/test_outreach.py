@@ -53,13 +53,25 @@ def test_draft_request_has_no_phone_and_records_named_products(factory, tmp_path
         assert request["contact_name"] == "Mr. Contact"
         assert "712345678" not in str(request)
         assert [o["sku"] for o in request["catalog_options"]] == ["A-WALL", "A-LUX"]
+        assert request["latest_site_note"]["text"]  # the hook for "now that ..."
+        assert request["pitch_angle"].startswith("high-value upgrade")
+        assert "Home Cinema" in request["goes_well_with"]
+        assert request["previous_message"] is None
         draft = outreach.create_draft(s, drafter, target, ALLOWED_ID, date(2025, 10, 1))
         assert "0712345678" not in draft.text  # scrubbed even if the AI writes a number
         assert draft.product_skus == ["A-WALL"]
         assert outreach.mark_sent(s, draft.id, ALLOWED_ID).sent_at is not None
         assert outreach.mark_replied(s, draft.id).replied_at is not None
     system = drafter.transport.requests[0]["messages"][0]["content"]
-    assert "Intelligent Home" in system
+    assert "Intelligent Home" in system and "Style examples" in system
+    with session_scope(factory) as s:
+        target = outreach.DraftTarget(
+            s.get(Project, ids["db:1"]), contact, resolve_category(s, "painting")
+        )
+        later = outreach.draft_request(s, target, date(2025, 10, 9))
+        assert later["previous_message"]["about"] == "Home Audio & Multi-room"
+        assert later["previous_message"]["they_replied"] is True
+        assert later["pitch_angle"].startswith("tie it to the build timeline")
 
 
 async def test_draft_command_and_buttons(factory, tmp_path, context):
@@ -119,3 +131,20 @@ async def test_draft_denied_and_usage(context):
     update = make_update(ALLOWED_ID)
     await outreach_handlers.draft(update, context)
     assert reply_of(update).startswith("Usage: /draft")
+
+
+def test_draft_checks_and_cleanup():
+    from brains_bot.services.outreach import Drafter, draft_problem
+
+    request = {"goes_well_with": ["Smart Home", "Home Cinema"],
+               "construction_stage": {"stage_number": 5},
+               "latest_site_note": {"text": "Skimming done"}}  # fmt: skip
+    assert "your Smart Home" in draft_problem("It keeps your smart home on.", request)
+    assert "roof" in draft_problem("Panels go up once the roof is on.", request)
+    assert draft_problem("Weatherproof speakers for the patio.", request) is None
+    # Still wrong after the one rewrite: fixed in code, and the sign-off gets its own line.
+    wrong = "Runs your future home cinema. The Intelligent Home team"
+    drafter = Drafter(FakeTransport(text(wrong), text(wrong)))
+    out = drafter.write(request)
+    assert out == "Runs a home cinema.\n\nThe Intelligent Home team"
+    assert "Rewrite the message" in drafter.transport.requests[1]["messages"][-1]["content"]

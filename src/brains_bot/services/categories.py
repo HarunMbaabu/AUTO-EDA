@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from functools import cache
 from importlib import resources
 from typing import Any
 
@@ -22,6 +23,12 @@ def load_definitions() -> list[dict[str, Any]]:
         if not (1 <= d["best_from"] <= d["best_to"] <= 7):
             raise ValueError(f"category {d['key']!r} has an invalid stage window")
     return definitions
+
+
+@cache
+def category_definitions() -> dict[str, dict[str, Any]]:
+    """key -> definition from data/categories.json (e.g. its pairs_with list)."""
+    return {d["key"]: d for d in load_definitions()}
 
 
 def sync_categories(session: Session, definitions: list[dict[str, Any]] | None = None) -> int:

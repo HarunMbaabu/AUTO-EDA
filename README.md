@@ -23,7 +23,7 @@ dashboard.
 | `/analyze <number> <category> [refresh]` | Authorized | AI assessment: fit, timing, recorded facts, inferred needs, unknowns, next step |
 | `/draft <number> <category>` | Authorized | AI-drafted WhatsApp message to the project's contact; **[Send via WhatsApp]** opens it in your WhatsApp (you press send), **[They replied]** records a reply |
 | `/top [category]`  | Authorized     | Best opportunities to pitch, with the reasons for each score |
-| `/followups`       | Authorized     | This week's summary: who to pitch, sent drafts with no reply, open quotes to chase |
+| `/followups [drafts]` | Authorized   | This week's summary: who to pitch, sent drafts with no reply, open quotes to chase; `drafts` writes three ready-to-send messages |
 | `/reminders on\|off` | Authorized   | The weekly summary, sent Mondays at 08:00 Nairobi time (on by default) |
 | `/newsite <message>` | Authorized | Add projects by pasting a WhatsApp site report (one site or a numbered list); follow-ups are matched by phone number; check, then tap Save |
 | `/contacts [trade] [area]` | Authorized | The contacts directory by trade, e.g. `/contacts contractor Migaa`, `/contacts interior designer`; `/contacts` alone shows the counts per trade |
@@ -229,7 +229,7 @@ Categories sit in four groups (`/categories` lists them; a category can be in tw
 | Group | Categories |
 |-------|------------|
 | Tech & Entertainment | Audio, Home Cinema, Smart Home, Security, Networking, Solar |
-| Finishes & Interiors | Paint, Flooring, Lighting, Joinery & Cabinets, Curtains & Blinds, Interior Design |
+| Finishes & Interiors | Paint, Waterproofing, Flooring, Lighting, Joinery & Cabinets, Curtains & Blinds, Interior Design |
 | Exterior & Landscaping | Paving, Gardens & Landscaping, Fencing & Gates, Outdoor Audio, Outdoor Living |
 | Utilities | Water, Air Conditioning, Solar |
 
@@ -257,6 +257,28 @@ stage. The bot **never sends anything**: tapping **📤 Send via WhatsApp** reco
 sent and shows an **Open WhatsApp** link (`wa.me`) that opens the message in your own
 WhatsApp, where you can edit it and press send. A contact with several numbers gets one button
 per number. **✅ They replied** records a reply, which feeds the dashboard's response rate.
+
+Drafts read like a personal follow-up from someone who knows the site:
+
+- **A hook from the site:** the latest note ("since the skimming is done at Katani…"); plans in a
+  note ("the client visits on Saturday") only if the note is under a week old.
+- **A pitch by group:** Tech & Entertainment as a high-value upgrade where everything works
+  together (solar keeps the cinema and smart home running); Finishes tied to the build
+  timeline ("now that the walls are drying…"); Exterior as an upsell on the finished outdoor
+  space ("music on the new patio"); Utilities on reliability and running costs.
+- **Why now, for this stage only:** the timing that applies to the recorded stage (e.g.
+  waterproofing before tiling); past the best stage, only options that do not disturb finished
+  work.
+- **One related idea** from the category's `pairs_with` list (e.g. solar with a home cinema),
+  offered as an option, never as something they already have.
+- **A follow-up opener** ("following up on the painting") when a message was already sent for
+  that site.
+- **One easy next step:** a site visit, a short call, or a quote or photos of similar work.
+
+A draft that still claims something the data does not support ("your smart home", a roof on a
+skimmed house) is rewritten once, then corrected by the bot. **Every Monday the summary comes
+with three ready-to-send drafts** for the best opportunities that have a WhatsApp number, each
+with its Send button; `/followups drafts` gives the same on demand.
 
 Marketing consent is imported as *unknown*, so every draft reminds you to send only to people
 who agreed to hear from you. The AI receives the contact's first name, the site name, area,

@@ -32,8 +32,9 @@ from brains_bot.database.models import (
 )
 from brains_bot.services import catalog
 from brains_bot.services.analysis import AnalysisError
+from brains_bot.services.categories import category_definitions
 from brains_bot.services.chat import no_contact_details, plain_text
-from brains_bot.services.stages import detect_stage
+from brains_bot.services.stages import STAGES, assess_timing, detect_stage
 
 log = logging.getLogger(__name__)
 
@@ -42,25 +43,57 @@ CONTACT_ROLES = ("contact_person", "owner")
 _TITLES = {"mr", "mrs", "ms", "miss", "madam", "dr", "eng", "arch", "prof"}
 
 DRAFT_PROMPT = """\
-You write short WhatsApp messages for a sales person at {company}, a Kenyan company that \
-installs home audio, home cinema and smart home systems. The sales person will read your \
-draft, may edit it, and sends it themselves.
+You write short WhatsApp follow-up messages for a sales person at {company}, a Kenyan company \
+that supplies and installs home technology (audio, home cinema, smart home, security, solar), \
+finishes and interiors (paint, waterproofing, flooring, lighting, joinery, curtains), exterior \
+works (paving, gardens, fencing, outdoor audio) and utilities (water, air conditioning). The \
+sales person reads your draft, may edit it, and sends it themselves.
 
 Write one message to the contact named in the data, about their building project and the \
-product category given. Rules:
-- 60 to 110 words, warm and respectful, plain text, no Markdown, at most one emoji.
-- Greet them by the name given (keep their title, e.g. "Mr. Richard"). If no name is given, \
-use "Hello".
-- Mention their project by name or area so they know it is personal.
-- Say why now is a sensible time for this category, using only the stage and timing given. \
-Never claim to know their plans, budget or preferences.
-- You may mention at most two products from catalog_options by their exact names, with \
-"from" prices only if given. Never invent products, prices, discounts or deadlines.
-- End with a simple question, such as whether they would be open to a short call or a site \
-visit.
-- Sign off with: {signature}
+category given. Make it feel like a personal follow-up from someone who knows the site:
+- Open with their name (keep a title, e.g. "Mr. Richard"; "Hello" if no name is given) and a \
+hook from the project: the site name or area, and what latest_site_note says about progress \
+("since the Westlands villa is almost finished", "now that the walls are drying"). Use only \
+facts in the data; never invent progress, compliments or details of the site, and never \
+mention a building step as still to come when the stage says it is done (a skimmed house \
+already has its roof).
+- Mention a plan or event from latest_site_note ("the client visits on Saturday") only if \
+days_ago is 7 or less; older plans may have passed.
+- If previous_message is given, this is a follow-up: refer back to it naturally ("following \
+up on the painting").
+- Then the pitch, using pitch_angle, and one clear reason why now, taken only from why_now \
+(e.g. cabling is cheaper before plastering, waterproofing must go in before tiling).
+- You may suggest one item from goes_well_with as an option that works with it ("we can \
+integrate it with the audio system"). Never write "your" before anything from \
+goes_well_with (not "your home cinema", not "your future smart home"): they may not have it. \
+Offer it as an option instead ("and if you are planning a home cinema, it can power that too").
+- You may name at most two products from catalog_options, by their exact names, with "from" \
+prices only if given. Never invent products, prices, discounts or deadlines.
+- End with one easy next step as a question: a free site visit, a short call, or sending a \
+quote or photos of similar work.
+- 50 to 100 words, warm and confident, plain text, no Markdown, at most one emoji.
+- Sign off on its own last line with: {signature}
+Style examples (for tone only; not facts about this customer):
+"Hi John, since the Westlands villa is almost finished, have you considered a solar backup? It \
+keeps your new home cinema and smart home running even during power cuts, and we can \
+integrate it with the audio system."
+"Hi Sarah, following up on the painting. Now that the walls are drying, it is the right time \
+to look at acoustic panels for the media room, so we can finish the interior design."
+"Hi David, the landscaping looks great. Don't forget we can add weatherproof outdoor speakers \
+so you can enjoy music on the new patio."
 Reply with the message text only.\
 """
+# How to pitch each group, after the sales team's own examples.
+PITCH_ANGLES = {
+    "Tech & Entertainment": "high-value upgrade: comfort, entertainment and peace of mind, "
+    "and everything working together (e.g. solar backup keeps the cinema and smart home on)",
+    "Finishes & Interiors": "tie it to the build timeline: what the current stage means for "
+    "the next finish, so the work is done once and done right",
+    "Exterior & Landscaping": "upsell on the finished outdoor space: how they will enjoy it "
+    "(music on the patio, a secure gate, a neat driveway)",
+    "Utilities": "reliability and running costs: water, power and cooling they can count on",
+}
+NOTE_CHARS = 300
 
 
 @dataclass
@@ -102,6 +135,29 @@ def whatsapp_url(phone_e164: str, text: str) -> str:
     return f"https://wa.me/{digits}?text={quote(text)}"
 
 
+def why_now(category: Category, stage, today: date) -> str:
+    """The timing argument for this stage only, so the AI cannot borrow advice for a step
+    that is already done (e.g. "before plastering" on a skimmed house)."""
+    timing = assess_timing(category, stage, today)
+    if timing.status == "in_window":
+        return category.timing_note
+    if timing.status == "early":
+        return (
+            f"It is early: a good time to plan it, so it is ready when the build reaches "
+            f"{STAGES[category.best_from]}."
+        )
+    if timing.status == "retrofit_only":
+        return (
+            "The ideal stage for wiring or built-in work has passed: pitch options that can be "
+            "added now without disturbing the finished work. Do not mention earlier building steps."
+        )
+    return "Do not mention construction timing; focus on the benefit for their home."
+
+
+def _names(session: Session) -> dict[str, str]:
+    return dict(session.execute(select(Category.key, Category.name)).all())
+
+
 def draft_request(session: Session, target: DraftTarget, today: date) -> dict[str, Any]:
     notes = list(
         session.execute(
@@ -111,6 +167,16 @@ def draft_request(session: Session, target: DraftTarget, today: date) -> dict[st
         )
     )
     stage = detect_stage(notes)
+    latest = max(notes, key=lambda n: n[0] or date.min, default=None)
+    definition = category_definitions().get(target.category.key, {})
+    names = _names(session)
+    pairs = [names[k] for k in definition.get("pairs_with", []) if k in names]
+    previous = session.execute(
+        select(OutreachDraft.category_key, OutreachDraft.sent_at, OutreachDraft.replied_at)
+        .where(OutreachDraft.project_id == target.project.id, OutreachDraft.sent_at.is_not(None))
+        .order_by(OutreachDraft.sent_at.desc())
+        .limit(1)
+    ).first()
     products = (
         catalog.suggestions(session, target.category.key, stage.stage, limit=3)
         if target.category.has_verified_catalog
@@ -125,10 +191,32 @@ def draft_request(session: Session, target: DraftTarget, today: date) -> dict[st
             "city": no_contact_details(target.project.city),
         },
         "construction_stage": {
+            "stage_number": stage.stage,
             "last_recorded_stage": stage.label,
             "recorded_on": stage.recorded_on.isoformat() if stage.recorded_on else None,
         },
+        "latest_site_note": (
+            {
+                "date": latest[0].isoformat() if latest[0] else None,
+                "days_ago": (today - latest[0]).days if latest[0] else None,
+                "text": no_contact_details(latest[1])[:NOTE_CHARS],
+            }
+            if latest
+            else None
+        ),
         "category": {"name": target.category.name, "description": target.category.description},
+        "pitch_angle": PITCH_ANGLES.get((target.category.groups or [""])[0], ""),
+        "why_now": why_now(target.category, stage, today),
+        "goes_well_with": pairs[:3],
+        "previous_message": (
+            {
+                "about": names.get(previous[0], previous[0]),
+                "sent_on": previous[1].date().isoformat(),
+                "they_replied": previous[2] is not None,
+            }
+            if previous
+            else None
+        ),
         "catalog_options": [
             {
                 "name": no_contact_details(p.name),
@@ -148,6 +236,21 @@ class Drafter:
         self.model = transport.model
 
     def write(self, request: dict[str, Any]) -> str:
+        text = self._write(request)
+        problem = draft_problem(text, request)
+        if problem:  # one rewrite with the mistake pointed out
+            text = self._write(request, fix=f"Rewrite the message: {problem}")
+        # Whatever is left: "your future smart home" -> "a smart home".
+        for item in request.get("goes_well_with") or []:
+            text = re.sub(
+                rf"\byour\s+(?:future\s+|new\s+)?({re.escape(item)})",
+                r"a \1",
+                text,
+                flags=re.IGNORECASE,
+            )
+        return text
+
+    def _write(self, request: dict[str, Any], fix: str | None = None) -> str:
         company = os.environ.get("OUTREACH_COMPANY", "").strip() or "Intelligent Home"
         signature = os.environ.get("OUTREACH_SIGNATURE", "").strip() or f"The {company} team"
         body = {
@@ -158,6 +261,7 @@ class Drafter:
                     "content": DRAFT_PROMPT.format(company=company, signature=signature),
                 },
                 {"role": "user", "content": json.dumps(request, ensure_ascii=False)},
+                *([{"role": "user", "content": fix}] if fix else []),
             ],
             "max_tokens": 400,
             "stream": False,
@@ -179,7 +283,34 @@ class Drafter:
         text = text.strip().strip('"').strip()
         if not text:
             raise AnalysisError("the AI returned an empty draft")
+        if signature.lower() not in text.lower():
+            text = f"{text}\n\n{signature}"
+        elif not text.endswith(f"\n{signature}"):  # keep the sign-off on its own last line
+            head = text[: text.lower().rindex(signature.lower())].rstrip()
+            text = f"{head}\n\n{signature}"
         return text[:MAX_DRAFT_CHARS]
+
+
+# Words for building steps; a draft must not talk about one as still to come once it is done.
+_STEP_WORDS = {1: r"\bfoundation", 3: r"\broof", 4: r"\bplaster"}
+
+
+def draft_problem(text: str, request: dict[str, Any]) -> str | None:
+    """What a draft claims that the data does not support, or None."""
+    lower = text.lower()
+    for item in request.get("goes_well_with") or []:
+        if re.search(rf"\byour\s+(?:\w+\s+){{0,2}}{re.escape(item.lower())}", lower):
+            return (
+                f'it says "your {item}", but they may not have one. Offer it as an option '
+                f'instead ("if you are planning ...").'
+            )
+    stage = (request.get("construction_stage") or {}).get("stage_number")
+    note = ((request.get("latest_site_note") or {}).get("text") or "").lower()
+    for number, pattern in _STEP_WORDS.items():
+        if stage and stage > number and re.search(pattern, lower) and not re.search(pattern, note):
+            word = pattern.removeprefix(r"\b")
+            return f"it mentions the {word}, which is already done at this stage; leave it out."
+    return None
 
 
 def create_draft(

@@ -1,5 +1,5 @@
 {
-  "_comment": "Product categories for opportunity analysis. Stages: 1 foundation/early works, 2 structure/walling, 3 roofing, 4 plastering, 5 skimming/finishing prep, 6 painting under way, 7 complete/handed over. best_from..best_to is the ideal window; retrofit_to is the latest stage where retrofit options still make sense (null = none). groups: the category groups it is listed under (a category can be in more than one, e.g. Solar). Sync to the database with: uv run brains-bot-categories",
+  "_comment": "Product categories for opportunity analysis. Stages: 1 foundation/early works, 2 structure/walling, 3 roofing, 4 plastering, 5 skimming/finishing prep, 6 painting under way, 7 complete/handed over. best_from..best_to is the ideal window; retrofit_to is the latest stage where retrofit options still make sense (null = none). groups: the category groups it is listed under (a category can be in more than one, e.g. Solar). pairs_with: categories to suggest alongside it in WhatsApp drafts (e.g. solar with a home cinema). Sync to the database with: uv run brains-bot-categories",
   "categories": [
     {
       "key": "audio",
@@ -11,7 +11,13 @@
       "best_from": 1,
       "best_to": 4,
       "retrofit_to": 7,
-      "timing_note": "Speaker cabling and back boxes go in before plastering; after that, wireless and surface-mounted options remain."
+      "timing_note": "Speaker cabling and back boxes go in before plastering; after that, wireless and surface-mounted options remain.",
+      "pairs_with": [
+        "cinema_addons",
+        "smart_home",
+        "outdoor_audio",
+        "networking"
+      ]
     },
     {
       "key": "cinema_addons",
@@ -23,7 +29,13 @@
       "best_from": 2,
       "best_to": 6,
       "retrofit_to": 7,
-      "timing_note": "The room layout, acoustic treatment and ceiling are planned before finishes; seating can be added at the end."
+      "timing_note": "The room layout, acoustic treatment and ceiling are planned before finishes; seating can be added at the end.",
+      "pairs_with": [
+        "audio",
+        "lighting",
+        "solar",
+        "interior_design"
+      ]
     },
     {
       "key": "smart_home",
@@ -35,7 +47,13 @@
       "best_from": 1,
       "best_to": 4,
       "retrofit_to": 7,
-      "timing_note": "Control wiring and conduit are easiest before plastering; wireless retrofit products exist for later stages."
+      "timing_note": "Control wiring and conduit are easiest before plastering; wireless retrofit products exist for later stages.",
+      "pairs_with": [
+        "lighting",
+        "security",
+        "solar",
+        "curtains"
+      ]
     },
     {
       "key": "security",
@@ -47,7 +65,12 @@
       "best_from": 1,
       "best_to": 4,
       "retrofit_to": 7,
-      "timing_note": "Camera and alarm cabling is easiest before plastering; wireless systems can be added later."
+      "timing_note": "Camera and alarm cabling is easiest before plastering; wireless systems can be added later.",
+      "pairs_with": [
+        "smart_home",
+        "fencing",
+        "solar"
+      ]
     },
     {
       "key": "networking",
@@ -59,7 +82,12 @@
       "best_from": 1,
       "best_to": 4,
       "retrofit_to": 7,
-      "timing_note": "Structured cabling goes in before plastering; mesh Wi-Fi can be added at any time."
+      "timing_note": "Structured cabling goes in before plastering; mesh Wi-Fi can be added at any time.",
+      "pairs_with": [
+        "smart_home",
+        "audio",
+        "security"
+      ]
     },
     {
       "key": "solar",
@@ -72,7 +100,13 @@
       "best_from": 3,
       "best_to": 6,
       "retrofit_to": 7,
-      "timing_note": "Panels go on once the roof is done; conduit and the inverter space are planned before plastering."
+      "timing_note": "Conduit and the inverter space are easiest to plan before plastering; panels and batteries can be added at any stage after that.",
+      "pairs_with": [
+        "smart_home",
+        "cinema_addons",
+        "water",
+        "ac"
+      ]
     },
     {
       "key": "painting",
@@ -80,11 +114,16 @@
       "groups": [
         "Finishes & Interiors"
       ],
-      "description": "Interior and exterior paint, premium and textured finishes, waterproofing and wallpapers.",
+      "description": "Interior and exterior paint, premium and textured finishes, and wallpapers.",
       "best_from": 4,
       "best_to": 6,
       "retrofit_to": null,
-      "timing_note": "Paint and finish systems are chosen around plastering and skimming and applied before handover."
+      "timing_note": "Paint and finish systems are chosen around plastering and skimming and applied before handover.",
+      "pairs_with": [
+        "waterproofing",
+        "interior_design",
+        "lighting"
+      ]
     },
     {
       "key": "flooring",
@@ -96,7 +135,11 @@
       "best_from": 4,
       "best_to": 6,
       "retrofit_to": 7,
-      "timing_note": "Floor finishes are chosen during finishing and laid before or around painting."
+      "timing_note": "Floor finishes are chosen during finishing and laid before or around painting.",
+      "pairs_with": [
+        "interior_design",
+        "cinema_addons"
+      ]
     },
     {
       "key": "lighting",
@@ -108,7 +151,12 @@
       "best_from": 2,
       "best_to": 6,
       "retrofit_to": 7,
-      "timing_note": "Lighting points are wired before plastering; fittings go up during finishing."
+      "timing_note": "Lighting points are wired before plastering; fittings go up during finishing.",
+      "pairs_with": [
+        "smart_home",
+        "interior_design",
+        "gardens"
+      ]
     },
     {
       "key": "joinery",
@@ -120,7 +168,12 @@
       "best_from": 4,
       "best_to": 7,
       "retrofit_to": null,
-      "timing_note": "Measured and designed during finishing; installed near or after handover."
+      "timing_note": "Measured and designed during finishing; installed near or after handover.",
+      "pairs_with": [
+        "interior_design",
+        "audio",
+        "cinema_addons"
+      ]
     },
     {
       "key": "curtains",
@@ -132,7 +185,27 @@
       "best_from": 5,
       "best_to": 7,
       "retrofit_to": null,
-      "timing_note": "Measured once windows and walls are finished; hung near or after handover."
+      "timing_note": "Measured once windows and walls are finished; hung near or after handover.",
+      "pairs_with": [
+        "smart_home",
+        "interior_design"
+      ]
+    },
+    {
+      "key": "waterproofing",
+      "name": "Waterproofing",
+      "groups": [
+        "Finishes & Interiors"
+      ],
+      "description": "Waterproofing of roofs, flat slabs, terraces, balconies, bathrooms, water tanks and foundations; damp-proofing and sealants.",
+      "best_from": 3,
+      "best_to": 5,
+      "retrofit_to": 7,
+      "timing_note": "Roofs, slabs and wet areas are waterproofed after roofing and before tiling and finishes; leaks can still be fixed later, at a higher cost.",
+      "pairs_with": [
+        "painting",
+        "paving"
+      ]
     },
     {
       "key": "interior_design",
@@ -144,7 +217,13 @@
       "best_from": 2,
       "best_to": 6,
       "retrofit_to": 7,
-      "timing_note": "Design decisions are best made before finishes go in; décor and styling remain possible after handover."
+      "timing_note": "Design decisions are best made before finishes go in; décor and styling remain possible after handover.",
+      "pairs_with": [
+        "cinema_addons",
+        "lighting",
+        "curtains",
+        "painting"
+      ]
     },
     {
       "key": "paving",
@@ -156,7 +235,12 @@
       "best_from": 6,
       "best_to": 7,
       "retrofit_to": null,
-      "timing_note": "Laid at the end of the build, once heavy machinery is off site."
+      "timing_note": "Laid at the end of the build, once heavy machinery is off site.",
+      "pairs_with": [
+        "gardens",
+        "outdoor_audio",
+        "fencing"
+      ]
     },
     {
       "key": "gardens",
@@ -168,7 +252,13 @@
       "best_from": 6,
       "best_to": 7,
       "retrofit_to": null,
-      "timing_note": "Done at the end of the build, after paving and external works."
+      "timing_note": "Done at the end of the build, after paving and external works.",
+      "pairs_with": [
+        "outdoor_audio",
+        "lighting",
+        "water",
+        "paving"
+      ]
     },
     {
       "key": "fencing",
@@ -180,7 +270,11 @@
       "best_from": 1,
       "best_to": 7,
       "retrofit_to": null,
-      "timing_note": "Often built early to secure the site; gates and automation can come at any stage."
+      "timing_note": "Often built early to secure the site; gates and automation can come at any stage.",
+      "pairs_with": [
+        "security",
+        "paving"
+      ]
     },
     {
       "key": "outdoor_audio",
@@ -192,7 +286,13 @@
       "best_from": 3,
       "best_to": 6,
       "retrofit_to": 7,
-      "timing_note": "Outdoor speaker cabling is laid before paving and landscaping; wireless options remain afterwards."
+      "timing_note": "Outdoor speaker cabling is laid before paving and landscaping; wireless options remain afterwards.",
+      "pairs_with": [
+        "gardens",
+        "outdoor",
+        "paving",
+        "audio"
+      ]
     },
     {
       "key": "outdoor",
@@ -204,7 +304,12 @@
       "best_from": 3,
       "best_to": 7,
       "retrofit_to": null,
-      "timing_note": "External cabling is best laid with landscaping works, which usually come late in the build."
+      "timing_note": "External cabling is best laid with landscaping works, which usually come late in the build.",
+      "pairs_with": [
+        "outdoor_audio",
+        "lighting",
+        "gardens"
+      ]
     },
     {
       "key": "water",
@@ -216,7 +321,11 @@
       "best_from": 1,
       "best_to": 4,
       "retrofit_to": 7,
-      "timing_note": "Plumbing routes, tanks and pump positions are planned early; equipment can be upgraded later."
+      "timing_note": "Plumbing routes, tanks and pump positions are planned early; equipment can be upgraded later.",
+      "pairs_with": [
+        "solar",
+        "gardens"
+      ]
     },
     {
       "key": "ac",
@@ -228,7 +337,11 @@
       "best_from": 2,
       "best_to": 4,
       "retrofit_to": 7,
-      "timing_note": "Refrigerant piping and drains go in before plastering; wall units can be retrofitted."
+      "timing_note": "Refrigerant piping and drains go in before plastering; wall units can be retrofitted.",
+      "pairs_with": [
+        "solar",
+        "smart_home"
+      ]
     }
   ],
   "groups": [

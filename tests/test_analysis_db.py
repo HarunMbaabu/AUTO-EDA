@@ -21,9 +21,9 @@ from tests.workbook_factory import build_slim_workbook
 
 def test_category_sync_is_idempotent_and_deactivates_removed(factory):
     with session_scope(factory) as s:
-        assert sync_categories(s) == 19
+        assert sync_categories(s) == 20
         sync_categories(s)
-        assert s.scalar(select(func.count()).select_from(Category)) == 19
+        assert s.scalar(select(func.count()).select_from(Category)) == 20
         keys = [c.key for c in active_categories(s)]
         assert keys[0] == "audio" and "interior_design" in keys
         assert not any(c.has_verified_catalog for c in active_categories(s))
