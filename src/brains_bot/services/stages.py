@@ -50,7 +50,10 @@ class StageResult:
 
 
 def _sentences(text: str) -> list[str]:
-    return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
+    # WhatsApp text often skips the space after a full stop ("interior.I will"): a capital
+    # letter straight after a stop also starts a new sentence (but "Mr.Kamau" style is rare).
+    parts = re.split(r"(?<=[.!?])\s+|(?<=[a-z][.!?])(?=[A-Z])|\n+", text)
+    return [s.strip() for s in parts if s.strip()]
 
 
 # A clause that says a stage has not happened yet ("plastering has not started", "waiting for

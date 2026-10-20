@@ -27,7 +27,7 @@ ANSWER = {"site_name": "Runda Mumwe Riaka project", "area": "Runda Mumwe Riaka",
 
 def test_extract_keeps_contact_details_local():
     transport = FakeTransport(text(json.dumps(ANSWER)))
-    draft = sites.extract(transport, REPORT)
+    (draft,) = sites.extract(transport, REPORT)
     sent = transport.requests[0]["messages"][1]["content"]
     assert "0721462244" not in sent and "maps.app" not in sent
     assert "Maina [phone].[map link]" in sent
@@ -42,14 +42,14 @@ def test_extract_keeps_contact_details_local():
 def test_extract_falls_back_when_the_ai_says_little():
     transport = FakeTransport(text(json.dumps({"area": "Kitengela", "contact_role": "boss",
                                                "contact_name": "null"})))  # fmt: skip
-    draft = sites.extract(transport, "Site in Kitengela, owner 0712 345 678 or 0722111222")
+    (draft,) = sites.extract(transport, "Site in Kitengela, owner 0712 345 678 or 0722111222")
     assert draft.site_name == "Kitengela site" and draft.contact_name is None
     assert draft.contact_role == "contact_person"
     assert draft.phone.numbers == ["+254712345678", "+254722111222"]
 
 
 def test_save_creates_a_project_the_rest_of_the_bot_can_use(factory, tmp_path):
-    draft = sites.extract(FakeTransport(text(json.dumps(ANSWER))), REPORT)
+    (draft,) = sites.extract(FakeTransport(text(json.dumps(ANSWER))), REPORT)
     with session_scope(factory) as s:
         project = sites.save(s, draft, date(2026, 10, 20))
         assert project.source_key.startswith("tg:") and project.site_visit_date == date(
@@ -57,7 +57,7 @@ def test_save_creates_a_project_the_rest_of_the_bot_can_use(factory, tmp_path):
         )
         assert project.google_location_url.startswith("https://maps.app.goo.gl/")
         note = s.scalar(select(ProjectNote).where(ProjectNote.project_id == project.id))
-        assert note.text == REPORT and note.field == "WhatsApp report"
+        assert note.text.startswith(REPORT) and note.field == "WhatsApp report"
         roles = list(
             s.scalars(select(ProjectContact.role).where(ProjectContact.project_id == project.id))
         )
@@ -88,8 +88,8 @@ async def test_newsite_preview_then_save(factory, context):
     update, status = _update(ALLOWED_ID, "/newsite " + REPORT)
     await site_handlers.newsite(update, context)
     preview = status.edit_text.await_args.args[0]
-    assert "Site: Runda Mumwe Riaka project" in preview and "+254 7XX XXX 244" in preview
-    assert "Contact: Maina (contractor)" in preview and "0721462244" not in preview
+    assert "NEW: Runda Mumwe Riaka project · Runda Mumwe Riaka, Nairobi" in preview
+    assert "Maina (contractor) · +254 7XX XXX 244 · map" in preview and "0721462244" not in preview
     save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
 
     query = SimpleNamespace(
@@ -99,7 +99,7 @@ async def test_newsite_preview_then_save(factory, context):
     tap.callback_query = query
     await site_handlers.site_callback(tap, context)
     saved = query.edit_message_text.await_args.args[0]
-    assert saved.startswith("Saved as project #") and "/draft " in saved
+    assert saved.startswith("Saved: 1 new project(s), 0 follow-up note(s).") and "/draft " in saved
     await site_handlers.site_callback(tap, context)  # a second tap does not save twice
     with session_scope(factory) as s:
         assert len(s.scalars(select(Project)).all()) == 1
@@ -133,3 +133,74 @@ async def test_newsite_denied_for_strangers(context):
     update, _ = _update(STRANGER_ID, "/newsite " + REPORT)
     await site_handlers.newsite(update, context)
     assert reply_of(update) == handlers.NOT_AUTHORIZED
+
+
+MULTI = """Good morning team today i will do my follow-up in Riverview, Golden palm.
+
+1. Hilum muraya 0757319583 - Its a site at Riverview preparing to finish on skimming.Hilum is the paint contractor.
+2. Dennis project 0708831086- Its a new project at Riverview 79.He is the care taker the house is skimmed in the interior.I will be meeting the Engineer.
+3. Ken Villa 0723255362...Its a follow up project at Golden palm. We were to supply on the exterior.
+"""  # noqa: E501
+MULTI_ANSWER = {"sites": [
+    {"site_name": "Hilum muraya project", "area": "Riverview", "contact_name": "Hilum muraya",
+     "contact_role": "contractor", "role_description": "paint contractor"},
+    {"site_name": "Dennis project", "area": "Riverview 79", "contact_name": "Dennis",
+     "contact_role": "contact_person", "role_description": "caretaker"},
+    {"site_name": "Ken Villa", "area": "Golden palm", "contact_role": "owner"},
+]}  # fmt: skip
+
+
+def test_split_report():
+    intro, items = sites.split_report(MULTI)
+    assert intro.startswith("Good morning team") and len(items) == 3
+    assert items[0].startswith("Hilum muraya 0757319583") and items[2].startswith("Ken Villa")
+    assert sites.split_report("One site only, no list") == ("", ["One site only, no list"])
+
+
+def test_a_numbered_list_becomes_several_sites_and_follow_ups_match_by_phone(factory):
+    transport = FakeTransport(text(json.dumps(MULTI_ANSWER)))
+    drafts = sites.extract(transport, MULTI)
+    payload = json.loads(transport.requests[0]["messages"][1]["content"])
+    assert len(payload["items"]) == 3 and "Riverview" in payload["context"]
+    assert not any(ch.isdigit() for item in payload["items"] for ch in item.replace("79", ""))
+    assert [d.phone.e164 for d in drafts] == ["+254757319583", "+254708831086", "+254723255362"]
+    assert drafts[1].role_description == "caretaker"
+    assert drafts[0].message.endswith("paint contractor.")  # each site keeps only its own text
+
+    with session_scope(factory) as s:
+        sites.match_existing(s, drafts)
+        assert all(d.existing_project_id is None for d in drafts)
+        ken = sites.save(s, drafts[2], date(2026, 10, 1))  # Ken Villa saved earlier
+
+    later = sites.extract(FakeTransport(text(json.dumps(MULTI_ANSWER))), MULTI)
+    with session_scope(factory) as s:
+        sites.match_existing(s, later)
+        assert later[2].existing_project_id == ken.id and later[0].existing_project_id is None
+        for draft in later:
+            sites.save(s, draft, date(2026, 10, 20))
+        assert len(s.scalars(select(Project)).all()) == 3  # no duplicate Ken Villa
+        notes = s.scalars(select(ProjectNote).where(ProjectNote.project_id == ken.id)).all()
+        assert len(notes) == 2 and notes[-1].observed_date == date(2026, 10, 20)
+        dennis = s.scalar(select(Project).where(Project.name == "Dennis project"))
+        note = s.scalar(select(ProjectNote.text).where(ProjectNote.project_id == dennis.id))
+        assert note.endswith("(Contact: Dennis, caretaker)")
+
+
+async def test_multi_site_preview_and_save_all(factory, context):
+    context.bot_data["db"] = factory
+    context.bot_data["drafter"] = Drafter(FakeTransport(text(json.dumps(MULTI_ANSWER))))
+    context.user_data = {}
+    update, status = _update(ALLOWED_ID, "/newsite " + MULTI)
+    await site_handlers.newsite(update, context)
+    preview = status.edit_text.await_args.args[0]
+    assert preview.startswith("3 sites: please check")
+    assert "2. NEW: Dennis project · Riverview 79" in preview and "Dennis (caretaker)" in preview
+    save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
+    assert save.text == "✅ Save all 3"
+    query = SimpleNamespace(
+        data=save.callback_data, answer=AsyncMock(), edit_message_text=AsyncMock()
+    )
+    tap = make_update(ALLOWED_ID)
+    tap.callback_query = query
+    await site_handlers.site_callback(tap, context)
+    assert query.edit_message_text.await_args.args[0].startswith("Saved: 3 new project(s)")
