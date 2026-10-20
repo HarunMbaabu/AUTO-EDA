@@ -126,7 +126,7 @@ async def test_newsite_contact_then_contacts_command(factory, context):
     reply = reply_of(update)
     assert "Contractors matching 'Migaa' (1)" in reply
     assert "Mike · Contractor · Florissant Construction · Migaa" in reply
-    assert "+254 7XX XXX 545" in reply and "15 Feb 2026" in reply
+    assert "+254 7XX XXX 545" in reply and "Met on 15 Feb 2026: " in reply
 
     update = make_update(ALLOWED_ID)
     context.args = []
@@ -155,3 +155,28 @@ def test_workbook_people_get_a_trade_from_their_column(factory, tmp_path):
 def test_notes_shown_with_numbers_masked():
     shown = contacts.note_for_display("Call Mike 0701 029 545 tomorrow")
     assert shown == "Call Mike +254 7XX XXX 545 tomorrow"
+
+
+@pytest.mark.parametrize(
+    ("note", "how"),
+    [
+        ("Met below contractor at Migaa", "Met"),
+        ("Called below contacts for projects on 4th feb 2026", "Called"),
+        ("Sent him a WhatsApp with the catalogue", "Messaged"),
+        ("Good contact for future projects", "Noted"),
+    ],
+)
+def test_how_contacted(note, how):
+    assert contacts.how_contacted(note) == how
+
+
+def test_workbook_people_show_their_latest_site_visit(factory, tmp_path):
+    from tests.test_import_db import _import
+    from tests.workbook_factory import build_slim_workbook
+
+    _import(factory, build_slim_workbook(tmp_path / "w.xlsx"))
+    with session_scope(factory) as s:
+        entries, _ = contacts.directory(s)
+        noted = [e for e in entries if e.last_note]
+        assert noted and all(e.last_how == "Site visit" for e in noted)
+        assert all(e.last_contact.startswith("Site visit on ") for e in noted if e.last_note_on)

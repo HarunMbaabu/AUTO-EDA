@@ -21,6 +21,7 @@ from brains_bot.database.models import (
     MarketingPermission,
     Project,
     ProjectContact,
+    ProjectNote,
 )
 from brains_bot.importers import normalize as n
 from brains_bot.services import project_service as svc
@@ -146,6 +147,27 @@ class Entry:
     projects: list[tuple[int, str]] = field(default_factory=list)
     last_note: str | None = None
     last_note_on: date | None = None
+    last_how: str | None = None  # "Met", "Called", "Messaged", "Site visit", "Noted"
+
+    @property
+    def last_contact(self) -> str | None:
+        """'Met on 15 Feb 2026', 'Called on 4 Feb 2026', ... for the latest note."""
+        if not self.last_note_on:
+            return self.last_how
+        return f"{self.last_how or 'Noted'} on {self.last_note_on:%d %b %Y}"
+
+
+_CALLED = re.compile(r"\b(call(ed|ing)?|phoned?|spoke|talked)\b", re.IGNORECASE)
+_MESSAGED = re.compile(r"\b(whats ?app(ed)?|texted|sms|messaged)\b", re.IGNORECASE)
+_MET = re.compile(r"\b(met|meet(ing)?|visit(ed)?|saw|site)\b", re.IGNORECASE)
+
+
+def how_contacted(note: str) -> str:
+    """How the person was reached, read from the note's own words."""
+    for pattern, how in ((_CALLED, "Called"), (_MESSAGED, "Messaged"), (_MET, "Met")):
+        if pattern.search(note):
+            return how
+    return "Noted"
 
 
 def directory(
@@ -200,8 +222,12 @@ def directory(
         .offset(offset)
         .limit(limit)
     ).all()
-    entries = [Entry(c, last_note=t, last_note_on=d) for c, t, d in rows]
+    entries = [
+        Entry(c, last_note=t, last_note_on=d, last_how=how_contacted(t) if t else None)
+        for c, t, d in rows
+    ]
     ids = [e.contact.id for e in entries]
+    _add_site_notes(session, [e for e in entries if e.last_note is None])
     links = session.execute(
         select(ProjectContact.contact_id, Project.id, Project.name)
         .join(Project, Project.id == ProjectContact.project_id)
@@ -212,6 +238,40 @@ def directory(
     for contact_id, project_id, name in links:
         by_contact[contact_id].projects.append((project_id, name))
     return entries, total
+
+
+def _add_site_notes(session: Session, entries: list[Entry]) -> None:
+    """People from the workbook have no notes of their own: show their site's latest visit."""
+    if not entries:
+        return
+    ranked = (
+        select(
+            ProjectContact.contact_id,
+            ProjectNote.text,
+            func.coalesce(ProjectNote.observed_date, Project.site_visit_date).label("on"),
+            func.row_number()
+            .over(
+                partition_by=ProjectContact.contact_id,
+                order_by=(
+                    func.coalesce(ProjectNote.observed_date, Project.site_visit_date)
+                    .desc()
+                    .nulls_last(),
+                    ProjectNote.id.desc(),
+                ),
+            )
+            .label("n"),
+        )
+        .join(Project, Project.id == ProjectContact.project_id)
+        .join(ProjectNote, ProjectNote.project_id == Project.id)
+        .where(ProjectContact.contact_id.in_([e.contact.id for e in entries]))
+        .subquery()
+    )
+    by_contact = {e.contact.id: e for e in entries}
+    for contact_id, text, on in session.execute(
+        select(ranked.c.contact_id, ranked.c.text, ranked.c.on).where(ranked.c.n == 1)
+    ):
+        entry = by_contact[contact_id]
+        entry.last_note, entry.last_note_on, entry.last_how = text, on, "Site visit"
 
 
 def note_for_display(text: str | None) -> str | None:

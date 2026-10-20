@@ -329,6 +329,7 @@ class ProjectTools:
                     "area": no_contact_details(e.contact.area),
                     "projects": [no_contact_details(f"#{pid} {name}") for pid, name in e.projects],
                     "latest_note_date": _iso(e.last_note_on),
+                    "latest_contact": e.last_how,
                     "latest_note": no_contact_details(e.last_note or "")[:NOTE_CHARS] or None,
                 }
                 for e in entries
