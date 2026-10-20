@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from brains_bot.database.models import CatalogProduct, Category
+from brains_bot.importers.normalize import redact_contact_details
 
 SHEET = "Catalog"
 REQUIRED = ("category", "sku", "name", "install_stage")
@@ -256,6 +257,10 @@ def product_summary(product: CatalogProduct, stage: int | None = None) -> dict[s
         "available": product.available,
         "price_checked": product.price_checked.isoformat() if product.price_checked else None,
     }
+    # Catalog rows are free text too: a supplier's phone or email must not reach the AI.
+    for key, value in summary.items():
+        if isinstance(value, str):
+            summary[key] = redact_contact_details(value)
     if stage is not None:
         summary["fits_current_stage_as"] = (
             "retrofit" if needs_retrofit(product, stage) else "normal install"

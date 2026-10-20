@@ -228,8 +228,8 @@ def build_context(
         "today": today.isoformat(),
         "project": {
             "reference": f"Project #{project.id}",
-            "area": project.area,
-            "city": project.city,
+            "area": redact_contact_details(project.area) if project.area else None,
+            "city": redact_contact_details(project.city) if project.city else None,
             "site_visit_date": project.site_visit_date.isoformat()
             if project.site_visit_date
             else None,

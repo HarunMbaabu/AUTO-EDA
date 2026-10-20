@@ -10,8 +10,9 @@ A transparent points score, not an AI guess, so every rank can be explained and 
   drafted in the last 30 days  -25 (recently pitched)
   lost quote for it         -20
 
-Projects that are too late for a category, or already have an open or won quote for it, are
-left out: they are no longer opportunities.
+Projects that are too late for a category, already have an open or won quote for it, or are
+no longer in the latest workbook are left out: they are no longer opportunities. An AI fit only
+counts when the analysis was made on the project's current data.
 """
 
 from __future__ import annotations
@@ -31,7 +32,9 @@ from brains_bot.database.models import (
     OutreachDraft,
     ProjectContact,
     Quote,
+    SourceRecord,
 )
+from brains_bot.importers.loader import STALE_REASON
 from brains_bot.services import catalog
 from brains_bot.services.metrics import project_stages
 from brains_bot.services.stages import CategoryWindow, assess_timing
@@ -81,17 +84,28 @@ def _reachable_projects(session: Session) -> set[int]:
 
 
 def _latest_fits(session: Session) -> dict[tuple[int, str], str]:
-    fits: dict[tuple[int, str], str] = {}
+    """The AI fit per project and category, from analyses that still describe the current
+    data: made on the project's latest import and after the category was last changed."""
+    latest_batch = (
+        select(SourceRecord.project_id, func.max(SourceRecord.batch_id).label("batch_id"))
+        .group_by(SourceRecord.project_id)
+        .subquery()
+    )
     rows = session.execute(
         select(
             OpportunityAssessment.project_id,
             OpportunityAssessment.category_key,
             OpportunityAssessment.result,
-        ).order_by(OpportunityAssessment.id)
+        )
+        .join(latest_batch, latest_batch.c.project_id == OpportunityAssessment.project_id)
+        .join(Category, Category.key == OpportunityAssessment.category_key)
+        .where(
+            OpportunityAssessment.data_batch_id == latest_batch.c.batch_id,
+            OpportunityAssessment.created_at >= Category.updated_at,
+        )
+        .order_by(OpportunityAssessment.id)
     )
-    for project_id, key, result in rows:
-        fits[(project_id, key)] = (result or {}).get("fit", "")
-    return fits
+    return {(pid, key): (result or {}).get("fit", "") for pid, key, result in rows}
 
 
 def _last_drafts(session: Session) -> dict[tuple[int, str], datetime]:
@@ -130,6 +144,8 @@ def rank(
 
     found: list[Opportunity] = []
     for project, stage in project_stages(session):
+        if STALE_REASON in (project.review_reasons or []):
+            continue  # no longer in the latest workbook: not something to pitch
         for category in categories:
             pair = (project.id, category.key)
             if quotes[pair] & {"open", "won"}:

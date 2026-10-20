@@ -3,10 +3,16 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from brains_bot.bot import followup_handlers, handlers
-from brains_bot.database.models import AuditEvent, OpportunityAssessment, OutreachDraft, Quote
+from brains_bot.database.models import (
+    AuditEvent,
+    OpportunityAssessment,
+    OutreachDraft,
+    Quote,
+    SourceRecord,
+)
 from brains_bot.database.session import session_scope
 from brains_bot.services import followups, opportunities
 from brains_bot.services.chat import ProjectTools
@@ -40,8 +46,11 @@ def test_rank_scores_and_reasons(factory, tmp_path):
         assert audio[ids["db:3"]].score == 5
         assert [o.project_id for o in opportunities.rank(s, TODAY, "audio", 10)][0] == ids["db:2"]
 
+        batch = s.scalar(
+            select(func.max(SourceRecord.batch_id)).where(SourceRecord.project_id == ids["db:1"])
+        )
         s.add(OpportunityAssessment(project_id=ids["db:1"], category_key="audio", model="m",
-                                    timing_status="retrofit_only",
+                                    data_batch_id=batch, timing_status="retrofit_only",
                                     result={"fit": "strong"}))  # fmt: skip
         s.add(OutreachDraft(project_id=ids["db:2"], category_key="audio", text="t", model="m",
                             created_at=_ago(3)))  # fmt: skip

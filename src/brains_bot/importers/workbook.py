@@ -29,6 +29,9 @@ HEADER_ALIASES = {
 # A row with none of these filled (and no ID) continues the record above it: in "Data Base"
 # one visit can span several rows, with the extra rows holding follow-up comments only.
 KEY_COLUMNS = ("Name of Potential Site", "Name of Salesperson", "Date of Site Visit")
+# A row without an ID that holds only these is a follow-up comment on the record above (merged
+# cells in the export). Anything else in it is its own record's data and must not be folded.
+CONTINUATION_COLUMNS = {"Comments (If Any)", "Jotun Comments", "Audio Status"}
 
 
 @dataclass
@@ -108,7 +111,15 @@ def read_sheet(ws: Worksheet) -> tuple[list[SourceRow], dict[str, str]]:
             continue
         has_key = any(not _is_blank(values.get(k)) for k in KEY_COLUMNS)
         is_project_sheet = ws.title in PROJECT_SHEETS
-        if is_project_sheet and _is_blank(values.get("ID")) and not has_key and records:
+        filled = {k for k, v in values.items() if not _is_blank(v)}
+        is_comment_only = filled <= CONTINUATION_COLUMNS
+        if (
+            is_project_sheet
+            and _is_blank(values.get("ID"))
+            and not has_key
+            and is_comment_only
+            and records
+        ):
             parent = records[-1]
             parent.extra.extend((k, v) for k, v in values.items() if not _is_blank(v))
             parent.last_row = row_idx
