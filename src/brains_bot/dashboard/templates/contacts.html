@@ -14,7 +14,7 @@
 <p class="muted">
   {% for t, c in counts %}<a href="/contacts?trade={{ t }}">{{ label(t) }} {{ c }}</a>{% if not loop.last %} · {% endif %}{% else %}No contacts with a trade yet.{% endfor %}
 </p>
-<p class="muted">{{ total }} contact{{ '' if total == 1 else 's' }}{% if trade %} · {{ label(trade) }}{% endif %}{% if q %} matching “{{ q }}”{% endif %}, latest note first.{% if total > entries|length %} Showing {{ entries|length }}.{% endif %}</p>
+<p class="muted">{{ total }} contact{{ '' if total == 1 else 's' }}{% if trade %} · {{ label(trade) }}{% endif %}{% if q %} matching “{{ q }}”{% endif %}, most recent note or site visit first.</p>
 <div class="card flush">
 <table class="rows">
   <thead><tr><th>Name</th><th>Trade</th><th>Company / area</th><th>Phone</th><th>Sites</th><th>Latest note</th></tr></thead>
@@ -26,10 +26,17 @@
     <td>{{ e.contact.company or "—" }}<div class="muted small">{{ e.contact.area or "" }}</div></td>
     <td>{{ e.contact.phone_e164 | phone if e.contact.phone_e164 else "—" }}</td>
     <td>{% for pid, name in e.projects[:3] %}<a href="/projects/{{ pid }}">#{{ pid }} {{ name }}</a>{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}{% if e.projects|length > 3 %}<div class="muted small">+{{ e.projects|length - 3 }} more</div>{% endif %}</td>
-    <td>{% if e.last_note %}<div class="muted small">{{ e.last_note_on.strftime('%d %b %Y') if e.last_note_on else "" }}</div>{{ e.last_note | truncate(160) }}{% else %}—{% endif %}</td>
+    <td>{% if e.last_note %}<div class="muted small">{{ e.last_note_on.strftime('%d %b %Y') if e.last_note_on else "" }}</div>{{ e.last_note | masked | truncate(160) }}{% else %}—{% endif %}</td>
   </tr>
   {% else %}<tr><td colspan="6" class="empty">No contacts found. Add one in Telegram with /newsite, e.g. “Met contractor Mike, Florissant Construction, Migaa 07…”.</td></tr>{% endfor %}
   </tbody>
 </table>
 </div>
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="?trade={{ trade }}&q={{ q | urlencode }}&page={{ page - 1 }}">◀ Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a href="?trade={{ trade }}&q={{ q | urlencode }}&page={{ page + 1 }}">Next ▶</a>{% endif %}
+</nav>
+{% endif %}
 {% endblock %}

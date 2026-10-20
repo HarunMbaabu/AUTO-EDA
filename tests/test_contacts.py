@@ -132,3 +132,26 @@ async def test_newsite_contact_then_contacts_command(factory, context):
     context.args = []
     await contact_handlers.contacts_command(update, context)
     assert "Known so far: Contractor 1." in reply_of(update)
+
+
+def test_workbook_people_get_a_trade_from_their_column(factory, tmp_path):
+    from tests.test_import_db import _import
+    from tests.workbook_factory import build_slim_workbook
+
+    _import(factory, build_slim_workbook(tmp_path / "w.xlsx"))
+    with session_scope(factory) as s:
+        counts = dict(contacts.trade_counts(s))
+        assert counts and set(counts) <= set(contacts.ROLE_TRADES.values())
+        entries, total = contacts.directory(s)
+        assert total == len(s.scalars(select(Contact)).all())  # everyone is listed
+        # A later note naming the trade replaces the placeholder, never a specific one.
+        site_contact = s.scalar(select(Contact).where(Contact.trade == "site_contact"))
+        contacts.fill(site_contact, "interior_designer", None, None)
+        assert site_contact.trade == "interior_designer"
+        contacts.fill(site_contact, "contractor", None, None)
+        assert site_contact.trade == "interior_designer"
+
+
+def test_notes_shown_with_numbers_masked():
+    shown = contacts.note_for_display("Call Mike 0701 029 545 tomorrow")
+    assert shown == "Call Mike +254 7XX XXX 545 tomorrow"

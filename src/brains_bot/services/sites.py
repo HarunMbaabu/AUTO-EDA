@@ -230,7 +230,9 @@ def extract(transport: Any, message: str, today: date | None = None) -> list[Sit
                 "content": EXTRACT_PROMPT.format(
                     count=len(items),
                     today=today.isoformat(),
-                    trades=", ".join(f'"{key}"' for key in contacts.TRADES),
+                    trades=", ".join(
+                        f'"{key}"' for key in contacts.TRADES if key not in contacts.GENERIC
+                    ),
                 ),
             },
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
@@ -403,7 +405,7 @@ def save(session: Session, draft: SiteDraft, today: date, actor: int | None = No
     session.flush()
     if draft.contact_name or draft.phone.numbers:
         contact = _contact(session, draft, key)
-        contacts.fill(contact, draft.trade, draft.company, draft.area)
+        contacts.fill(contact, draft.trade or "site_contact", draft.company, draft.area)
         # The person to talk to is the contact person, whatever their job on site, so drafts
         # and follow-ups find them; a named owner is also recorded as the owner.
         roles = {"contact_person"} | ({"owner"} if draft.contact_role == "owner" else set())
