@@ -13,6 +13,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "openpyxl>=3.1.5",
     "psycopg[binary]>=3.2",
+    "pypdf[image]>=6.21.1",
     "python-dotenv>=1.2.4",
     "python-multipart>=0.0.32",
     "python-telegram-bot[job-queue]>=21",

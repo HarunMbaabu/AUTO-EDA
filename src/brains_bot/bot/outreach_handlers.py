@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from brains_bot.bot import brochure_handlers
 from brains_bot.bot.formatting import truncate
 from brains_bot.bot.handlers import (
     NOT_AUTHORIZED,
@@ -21,7 +22,7 @@ from brains_bot.bot.handlers import (
 from brains_bot.bot.project_handlers import DB_ERROR, _guard_db, _with_session
 from brains_bot.database.models import Contact, OutreachDraft, Project
 from brains_bot.importers.normalize import mask_phone
-from brains_bot.services import outreach
+from brains_bot.services import brochures, outreach
 from brains_bot.services import project_service as svc
 from brains_bot.services.analysis import AnalysisError
 from brains_bot.services.categories import resolve_category
@@ -74,9 +75,14 @@ def _phones(contact: Contact | None) -> list[str]:
 
 
 def draft_message(
-    project: Project, category, contact: Contact | None, created: OutreachDraft
+    project: Project,
+    category,
+    contact: Contact | None,
+    created: OutreachDraft,
+    brochure_count: int = 0,
 ) -> tuple[str, InlineKeyboardMarkup | None]:
-    """The draft as shown in Telegram, with its Send buttons."""
+    """The draft as shown in Telegram, with its Send buttons (and the category's brochures,
+    to forward with the message)."""
     phones = _phones(contact)
     to = contact.name if contact else "no contact person on record"
     numbers = ", ".join(mask_phone(n) for n in phones) or "no valid WhatsApp number"
@@ -92,7 +98,12 @@ def draft_message(
         else "There is no valid number on record, so there is no WhatsApp link. "
         f"Check /project {project.id}.",
     ]
-    return truncate("\n".join(lines), 4000), _buttons(created, phones)
+    buttons = _buttons(created, phones)
+    extra = brochure_handlers.draft_button(category.key, brochure_count)
+    if extra:
+        rows = list(buttons.inline_keyboard) if buttons else []
+        buttons = InlineKeyboardMarkup([*rows, extra])
+    return truncate("\n".join(lines), 4000), buttons
 
 
 @restricted("draft")
@@ -117,16 +128,17 @@ async def draft(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         project = session.get(Project, project_id)
         category = resolve_category(session, category_text)
         if project is None or category is None:
-            return project, category, None, None
+            return project, category, None, None, 0
         contact = outreach.pick_contact(session, project.id)
         target = outreach.DraftTarget(project, contact, category)
         created = outreach.create_draft(session, drafter, target, actor, date.today())
         svc.record_audit(session, actor, "draft_created", target=f"project:{project.id}",
                          category=category.key, draft=created.id)  # fmt: skip
-        return project, category, contact, created
+        count = brochures.library(session, [category.key])[1]
+        return project, category, contact, created, count
 
     try:
-        project, category, contact, created = await _with_session(context, work)
+        project, category, contact, created, count = await _with_session(context, work)
     except AnalysisError as exc:
         await status.edit_text(f"Drafting failed: {exc}")
         return
@@ -143,7 +155,7 @@ async def draft(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
-    text, buttons = draft_message(project, category, contact, created)
+    text, buttons = draft_message(project, category, contact, created, count)
     await status.edit_text(text, reply_markup=buttons)
 
 

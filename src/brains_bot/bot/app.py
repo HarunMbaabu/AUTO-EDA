@@ -17,6 +17,7 @@ from telegram.ext import (
 
 from brains_bot.bot import (
     analysis_handlers,
+    brochure_handlers,
     chat_handlers,
     contact_handlers,
     followup_handlers,
@@ -114,6 +115,7 @@ def build_application(settings: Settings) -> Application:
         "merge": repeat_handlers.merge_command,
         "partner": partner_handlers.partner_command,
         "partners": partner_handlers.partners_command,
+        "brochures": brochure_handlers.brochures_command,
         "top": followup_handlers.top,
         "followups": followup_handlers.followups_command,
         "reminders": followup_handlers.reminders,
@@ -138,6 +140,16 @@ def build_application(settings: Settings) -> Application:
     )
     application.add_handler(
         CallbackQueryHandler(
+            brochure_handlers.file_callback, pattern=brochure_handlers.FILE_CALLBACK
+        )
+    )
+    application.add_handler(
+        CallbackQueryHandler(
+            brochure_handlers.send_callback, pattern=brochure_handlers.SEND_CALLBACK
+        )
+    )
+    application.add_handler(
+        CallbackQueryHandler(
             project_handlers.projects_page_callback, pattern=project_handlers.PAGE_CALLBACK
         )
     )
@@ -146,6 +158,13 @@ def build_application(settings: Settings) -> Application:
     )
     application.add_handler(
         MessageHandler(PRIVATE_CHAT & filters.TEXT & ~filters.COMMAND, chat_handlers.chat_message)
+    )
+    # PDFs and photos are brochures; other files (Excel) are workbook or catalog imports.
+    application.add_handler(
+        MessageHandler(
+            PRIVATE_CHAT & (filters.PHOTO | filters.Document.PDF | filters.Document.IMAGE),
+            brochure_handlers.file_received,
+        )
     )
     application.add_handler(
         MessageHandler(PRIVATE_CHAT & filters.Document.ALL, import_handlers.workbook_upload)

@@ -22,7 +22,7 @@ from brains_bot.bot.handlers import (
 )
 from brains_bot.bot.project_handlers import DB_ERROR, _guard_db, _with_session
 from brains_bot.importers.normalize import mask_phone
-from brains_bot.services import contacts, partners
+from brains_bot.services import brochures, contacts, partners
 from brains_bot.services import project_service as svc
 from brains_bot.services.analysis import AnalysisError
 
@@ -31,6 +31,7 @@ log = logging.getLogger(__name__)
 PARTNER_CALLBACK = re.compile(r"^partner:(save|cancel):([A-Za-z0-9_-]{6,20})$")
 AWAITING = "awaiting_partner"
 PENDING = "pending_partners"
+BROCHURES = "pending_partner_brochures"
 NOT_AVAILABLE = "Adding partners needs MISTRAL_API_KEY or DEEPSEEK_API_KEY to be set."
 ASK = (
     "Paste the details now: one partner, or a numbered list (1. ... 2. ...). Include the work "
@@ -54,7 +55,7 @@ def _draft_lines(i: int | None, draft: partners.PartnerDraft, names: dict[str, s
     return lines
 
 
-def _preview(drafts: list[partners.PartnerDraft], names: dict[str, str]) -> str:
+def preview(drafts: list[partners.PartnerDraft], names: dict[str, str]) -> str:
     many = len(drafts) > 1
     lines = [f"{len(drafts)} partners: please check" if many else "Partner: please check", ""]
     for i, draft in enumerate(drafts, start=1):
@@ -89,13 +90,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
         await status.edit_text("Something went wrong reading that. Please try again.")
         return
     token = secrets.token_urlsafe(9)
+    remember(context, token, drafts)
+    await status.edit_text(preview(drafts, names), reply_markup=save_buttons(token, len(drafts)))
+
+
+def remember(
+    context: ContextTypes.DEFAULT_TYPE,
+    token: str,
+    drafts: list[partners.PartnerDraft],
+    brochure: dict | None = None,
+) -> None:
+    """Keep the drafts until Save; a brochure they came from is filed under the partner."""
     context.user_data.setdefault(PENDING, {})[token] = drafts
-    label = f"✅ Save all {len(drafts)}" if len(drafts) > 1 else "✅ Save"
-    buttons = InlineKeyboardMarkup(
+    if brochure is not None:
+        context.user_data.setdefault(BROCHURES, {})[token] = brochure
+
+
+def save_buttons(token: str, count: int) -> InlineKeyboardMarkup:
+    label = f"✅ Save all {count}" if count > 1 else "✅ Save"
+    return InlineKeyboardMarkup(
         [[InlineKeyboardButton(label, callback_data=f"partner:save:{token}"),
           InlineKeyboardButton("✖ Cancel", callback_data=f"partner:cancel:{token}")]]
     )  # fmt: skip
-    await status.edit_text(_preview(drafts, names), reply_markup=buttons)
 
 
 @restricted("partner")
@@ -124,6 +140,7 @@ async def partner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     action, token = match.groups()
     drafts = pending.pop(token, None)
+    brochure = context.user_data.get(BROCHURES, {}).pop(token, None)
     if drafts is None:
         await query.answer("This preview has expired. Send /partner again.", show_alert=True)
         return
@@ -140,13 +157,25 @@ async def partner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             action_name = "partner_created" if is_new else "partner_updated"
             svc.record_audit(session, actor, action_name, target=f"contact:{contact.id}")
             saved.append((contact.name, is_new, len(draft.rates)))
+            if brochure is not None:
+                brochures.save(
+                    session,
+                    **{k: brochure[k] for k in ("file_id", "file_unique_id", "kind",
+                                                "file_name", "mime", "size")},
+                    title=f"{draft.company or contact.name} brochure",
+                    supplier=draft.company or contact.name,
+                    categories=draft.services,
+                    pages=brochure.get("pages"),
+                    contact_id=contact.id,
+                    actor=actor,
+                )  # fmt: skip
         return saved
 
     try:
         saved = await _with_session(context, work)
     except Exception:
         log.exception("saving partners failed", extra={"event": "db_error"})
-        pending[token] = drafts
+        remember(context, token, drafts, brochure)
         await query.answer(DB_ERROR[:190], show_alert=True)
         return
     await query.answer("Saved.")
