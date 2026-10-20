@@ -267,15 +267,16 @@ def extract(transport: Any, message: str, today: date | None = None) -> list[Sit
         fields = found[i] if i < len(found) and isinstance(found[i], dict) else {}
         area = _clean(fields.get("area"))
         role = fields.get("contact_role")
+        contact_name = _clean(fields.get("contact_name"))
         map_match = _MAP_LINK.search(item)
         drafts.append(
             SiteDraft(
                 message=item,
-                site_name=_clean(fields.get("site_name"))
+                site_name=_site_name(_clean(fields.get("site_name")), contact_name)
                 or (f"{area} site" if area else "New site"),
                 area=area,
                 city=_clean(fields.get("city"), 60),
-                contact_name=_clean(fields.get("contact_name")),
+                contact_name=_without_trade(contact_name),
                 contact_role=role if role in ROLES else "contact_person",
                 role_description=_clean(fields.get("role_description"), 60),
                 phone=find_phones(_MAP_LINK.sub(" ", item)),
@@ -335,6 +336,14 @@ def match_existing(session: Session, drafts: list[SiteDraft]) -> None:
                 draft.possible_project_id, draft.possible_name = maybe
 
 
+def _site_name(site_name: str | None, contact_name: str | None) -> str | None:
+    """'George Contractor project' -> 'George project'."""
+    trimmed = _without_trade(contact_name)
+    if site_name and contact_name and trimmed != contact_name and contact_name in site_name:
+        return site_name.replace(contact_name, trimmed)
+    return site_name
+
+
 def _contact(session: Session, draft: SiteDraft, project_key: str) -> Contact:
     name = draft.contact_name or "Contact"
     key_name = n.name_key(name)
@@ -347,12 +356,17 @@ def _contact(session: Session, draft: SiteDraft, project_key: str) -> Contact:
     if contact is None:
         contact = Contact(contact_key=key, name=name)
         session.add(contact)
-    if draft.phone.numbers:
+    if draft.phone.raw:  # a mistyped number is kept too, so it can be seen and corrected
         contact.phone_raw = draft.phone.raw
         contact.phone_e164 = draft.phone.e164
         contact.phone_status = draft.phone.status
         contact.phone_candidates = draft.phone.numbers
     session.flush()
+    _ensure_permissions(session, contact)
+    return contact
+
+
+def _ensure_permissions(session: Session, contact: Contact) -> None:
     for channel in ("whatsapp", "sms"):
         exists = session.scalar(
             select(MarketingPermission.id).where(
@@ -362,7 +376,6 @@ def _contact(session: Session, draft: SiteDraft, project_key: str) -> Contact:
         )
         if exists is None and contact.phone_candidates:
             session.add(MarketingPermission(contact_id=contact.id, channel=channel))
-    return contact
 
 
 def _note(draft: SiteDraft) -> str:
@@ -401,7 +414,15 @@ def save(session: Session, draft: SiteDraft, today: date, actor: int | None = No
             known = _project_contacts_with(session, project.id, draft.phone.numbers)
             for contact in known:
                 contacts.fill(contact, draft.trade, draft.company, None)
-            if draft.phone.numbers and not known:
+            unusable = _same_person_without_a_number(session, project.id, draft.contact_name)
+            if draft.phone.numbers and not known and unusable is not None:
+                # The number was missing or mistyped last time: this is the right one.
+                unusable.phone_raw, unusable.phone_e164 = draft.phone.raw, draft.phone.e164
+                unusable.phone_status = draft.phone.status
+                unusable.phone_candidates = draft.phone.numbers
+                contacts.fill(unusable, draft.trade, draft.company, None)
+                _ensure_permissions(session, unusable)
+            elif draft.phone.numbers and not known:
                 # A new number for this site (e.g. Airtel this time, Safaricom before): link it,
                 # so the next follow-up with either number is recognised.
                 contact = _contact(session, draft, project.source_key)
@@ -438,6 +459,47 @@ def save(session: Session, draft: SiteDraft, today: date, actor: int | None = No
     )
     session.flush()
     return Saved("new_site", project.id, project.name)
+
+
+def _same_person_without_a_number(
+    session: Session, project_id: int, name: str | None
+) -> Contact | None:
+    first = repeats.first_name(name)
+    if first is None:
+        return None
+    for contact in session.scalars(
+        select(Contact)
+        .join(ProjectContact, ProjectContact.contact_id == Contact.id)
+        .where(ProjectContact.project_id == project_id, Contact.phone_e164.is_(None))
+    ):
+        if not contact.phone_candidates and repeats.first_name(contact.name) == first:
+            return contact
+    return None
+
+
+def number_problems(phone: n.PhoneResult) -> list[str]:
+    """'07248002338 has 11 digits' for each number in the report that is not a usable one."""
+    problems = []
+    for part in phone.invalid_parts:
+        digits = re.sub(r"\D", "", part)
+        problems.append(f"{part} has {len(digits)} digits")
+    return problems
+
+
+_TRADE_WORDS = {"contractor", "contractors", "interior", "designer", "architect", "developer",
+                "engineer", "foreman", "fundi", "painter", "caretaker", "care", "taker",
+                "owner", "client", "surveyor", "manager", "site", "project"}  # fmt: skip
+
+
+def _without_trade(name: str | None) -> str | None:
+    """'George Contractor' -> 'George', 'Ken interior designer' -> 'Ken': the trade is kept in
+    its own field."""
+    if not name:
+        return name
+    words = name.split()
+    while len(words) > 1 and words[-1].lower().strip(".,") in _TRADE_WORDS:
+        words.pop()
+    return " ".join(words)
 
 
 def _project_contacts_with(session: Session, project_id: int, numbers: list[str]) -> list[Contact]:

@@ -162,3 +162,54 @@ def test_the_area_is_also_read_from_the_message_when_the_ai_leaves_it_out(factor
         assert found == (betty_id, "Betty project")
         # The name alone (here also in the site name) is not enough.
         assert repeats.same_name_and_area(s, "Betty", None, "Betty project", "in Ruiru") is None
+
+
+KIORA = """3rd March 2026
+Kiora area
+I went to Kiora and i made some follow up and also identified two new.
+1.Bahati project 0705769076... Its a new project in kiora which is partially skimmed.
+2.Kagui Contractor 0722453478.... Its a follow up project, they purchased skimming products.
+3.Ken interior designer 07248002338 project..... He has a stalled project at kiora.
+4.George Contractor 0718593948....He is a contractor at Kiora and its a new project."""
+KIORA_ANSWER = {"sites": [
+    {"site_name": "Bahati project", "area": "Kiora"},
+    {"site_name": "Kagui project", "area": "Kiora", "contact_name": "Kagui Contractor",
+     "contact_role": "contractor"},
+    {"site_name": "Ken project", "area": "Kiora", "contact_name": "Ken",
+     "contact_role": "contact_person", "role_description": "interior designer"},
+    {"site_name": "George Contractor project", "area": "Kiora",
+     "contact_name": "George Contractor", "contact_role": "contractor"},
+]}  # fmt: skip
+
+
+async def test_a_mistyped_number_is_flagged_kept_and_corrected_by_a_follow_up(factory, context):
+    context.bot_data["db"] = factory
+    context.user_data = {}
+    context.bot_data["drafter"] = Drafter(FakeTransport(text(json.dumps(KIORA_ANSWER))))
+    update, status = _update(ALLOWED_ID, "/newsite " + KIORA)
+    await site_handlers.newsite(update, context)
+    preview = status.edit_text.await_args.args[0]
+    assert "Ken (interior designer) · ⚠ CHECK NUMBER: 07248002338 has 11 digits" in preview
+    assert "not a valid Kenyan mobile number" in preview
+    assert "4. NEW: George project" in preview and "George (contractor)" in preview
+    assert "Kagui (contractor)" in preview
+    save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
+    tap, _ = _tap(save.callback_data)
+    await site_handlers.site_callback(tap, context)
+    with session_scope(factory) as s:
+        ken_id = s.scalar(select(Project.id).where(Project.name == "Ken project"))
+        ken = s.scalar(select(Contact).where(Contact.name == "Ken"))
+        assert ken.phone_raw == "07248002338" and ken.phone_status == "invalid"
+
+    # The right number, sent later as a follow-up, goes on Ken's entry.
+    fix = {"site_name": "Ken project", "area": "Kiora", "contact_name": "Ken"}
+    context.bot_data["drafter"] = Drafter(FakeTransport(text(json.dumps(fix))))
+    update, status = _update(ALLOWED_ID, "/newsite Ken in Kiora, correct number 0724800233")
+    await site_handlers.newsite(update, context)
+    assert f"POSSIBLE REPEAT → #{ken_id} Ken project" in status.edit_text.await_args.args[0]
+    save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
+    tap, _ = _tap(save.callback_data)
+    await site_handlers.site_callback(tap, context)
+    with session_scope(factory) as s:
+        kens = s.scalars(select(Contact).where(Contact.name == "Ken")).all()
+        assert [(k.phone_e164, k.phone_status) for k in kens] == [("+254724800233", "valid")]
