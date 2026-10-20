@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "_stage_form.html" import stage_form with context %}
+{% block title %}Plan{% endblock %}
+{% block content %}
+<h1>Plan</h1>
+<p class="muted">What needs doing this week, this month and in the next three months. Drafting and sending happen in Telegram; stages can be confirmed here.</p>
+<nav class="tabs">{% for p in periods %}<a href="#period-{{ loop.index }}">{{ p.title.split(' (')[0] }} <span class="badge">{{ p.count }}</span></a>{% endfor %}</nav>
+{% for period in periods %}
+{% set period_no = loop.index %}
+<section class="section" id="period-{{ period_no }}">
+  <h2>{{ period.title }}</h2>
+  {% for s in period.sections %}
+  <div class="card">
+    <h3>{{ s.title }} <span class="muted small">({{ s.items | length }})</span></h3>
+    <p class="muted small">{{ s.hint }}</p>
+    {% if s.items %}
+    <table class="rows"><thead><tr><th>Project</th><th>What</th><th>When / stage</th></tr></thead><tbody>
+    {% for i in s.items %}
+    <tr>
+      <td><a href="/projects/{{ i.project_id }}">#{{ i.project_id }} {{ i.project }}</a><div class="muted small">{{ i.area or "" }}</div></td>
+      <td>{{ i.what }}{% if i.detail %}<div class="muted small">{% if i.detail.startswith('/') %}<code>{{ i.detail }}</code>{% else %}{{ i.detail }}{% endif %}</div>{% endif %}</td>
+      <td>{% if i.due %}{{ i.due.strftime('%a %d %b') }}{% if i.due < today %} <span class="badge warn">overdue</span>{% endif %}{% endif %}
+        {% if i.stage %}<div>{{ i.stage }}<span class="muted small"> · {{ i.recorded_on.strftime('%d %b %Y') if i.recorded_on else "no date" }}</span></div>
+        {{ stage_form(i.project_id, i.stage, request.url.path ~ '#period-' ~ period_no, warn=i.stale) }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody></table>
+    {% else %}<p class="empty">Nothing here.</p>{% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endfor %}
+{% endblock %}

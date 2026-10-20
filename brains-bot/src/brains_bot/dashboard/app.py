@@ -36,9 +36,9 @@ from brains_bot.database.models import (
 )
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
 from brains_bot.importers.normalize import mask_phone
-from brains_bot.services import contacts, followups, metrics, opportunities, partners
+from brains_bot.services import contacts, followups, metrics, opportunities, partners, plan
 from brains_bot.services import project_service as svc
-from brains_bot.services.stages import detect_stage
+from brains_bot.services.stages import STALE_AFTER_DAYS, detect_stage
 
 from .auth import verify_login
 
@@ -113,6 +113,7 @@ def create_app(
     templates.env.filters["phone"] = mask_phone
     templates.env.filters["masked"] = contacts.note_for_display
     templates.env.globals["timing_labels"] = metrics.TIMING_LABELS
+    templates.env.globals["stage_choices"] = plan.stage_choices()
 
     def db():
         with session_scope(factory) as session:
@@ -366,6 +367,9 @@ def create_app(
                 "user": me,
                 "d": detail,
                 "stage": stage,
+                "stage_stale": bool(
+                    stage.recorded_on and (date.today() - stage.recorded_on).days > STALE_AFTER_DAYS
+                ),
                 "categories": categories,
                 "category_names": names,
                 "products": products,
@@ -418,6 +422,43 @@ def create_app(
             session, me["id"], "quote_created", target=f"project:{project_id}", quote=quote.id
         )
         return RedirectResponse(f"/projects/{project_id}#quotes", status_code=303)
+
+    @app.post("/projects/{project_id}/stage")
+    def update_stage(
+        request: Request,
+        project_id: int,
+        stage: int = Form(...),
+        on: str = Form(""),
+        note: str = Form(""),
+        back: str = Form(""),
+        csrf: str = Form(""),
+        me=Depends(user),
+        session: Session = Depends(db),
+    ):
+        check_csrf(request, csrf)
+        try:
+            when = date.fromisoformat(on) if on else date.today()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="The date must be YYYY-MM-DD") from None
+        if when > date.today():
+            raise HTTPException(status_code=400, detail="The date cannot be in the future")
+        if plan.record_stage(session, project_id, stage, when, note, me["id"]) is None:
+            raise HTTPException(status_code=404, detail="No such project or stage")
+        svc.record_audit(
+            session, me["id"], "stage_confirmed", target=f"project:{project_id}", stage=stage
+        )
+        # Back to the page the form was on (a local path only).
+        target = back if back.startswith("/") and not back.startswith("//") else "/"
+        return RedirectResponse(target, status_code=303)
+
+    @app.get("/plan", response_class=HTMLResponse)
+    def plan_page(request: Request, me=Depends(user), session: Session = Depends(db)):
+        today = date.today()
+        return render(
+            request,
+            "plan.html",
+            {"user": me, "periods": plan.build(session, today), "stages": plan.stage_choices()},
+        )
 
     @app.post("/quotes/{quote_id}/status")
     def quote_status(

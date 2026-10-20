@@ -1,6 +1,7 @@
+{% from "_stage_form.html" import stage_form with context %}
 {% if leads %}
 <table><thead><tr><th>Project</th><th>Categories</th><th>Stage (recorded)</th></tr></thead><tbody>
 {% for l in leads %}<tr><td><a href="/projects/{{ l.project_id }}">#{{ l.project_id }} {{ l.project }}</a><div class="muted small">{{ l.area or "" }}</div></td>
-<td>{{ l.categories | join(', ') }}</td><td>{{ l.stage }}<div class="muted small">{{ l.recorded_on.strftime('%d %b %Y') if l.recorded_on else "no date" }}{% if l.stale %} · <span class="badge warn" title="Recorded more than 4 months ago">⚠ confirm</span>{% endif %}</div></td></tr>{% endfor %}
+<td>{{ l.categories | join(', ') }}</td><td>{{ l.stage }}<div class="muted small">{{ l.recorded_on.strftime('%d %b %Y') if l.recorded_on else "no date" }}</div>{{ stage_form(l.project_id, l.stage, request.url.path, warn=l.stale) }}</td></tr>{% endfor %}
 </tbody></table>
 {% else %}<p class="empty">None right now.</p>{% endif %}
