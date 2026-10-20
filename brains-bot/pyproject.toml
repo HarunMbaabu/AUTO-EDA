@@ -1,0 +1,58 @@
+[project]
+name = "brains-bot"
+version = "0.1.0"
+description = "Human-in-the-loop sales intelligence Telegram bot"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.0",
+    "anthropic>=1.15.0",
+    "fastapi>=0.151.0",
+    "httpx>=0.27",
+    "itsdangerous>=2.2.0",
+    "jinja2>=3.1.6",
+    "openpyxl>=3.1.5",
+    "psycopg[binary]>=3.2",
+    "python-dotenv>=1.2.4",
+    "python-multipart>=0.0.32",
+    "python-telegram-bot[job-queue]>=21",
+    "sqlalchemy>=2.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+brains-bot = "brains_bot.__main__:main"
+brains-bot-check-anthropic = "brains_bot.services.anthropic_check:main"
+brains-bot-import = "brains_bot.importers.cli:main"
+brains-bot-categories = "brains_bot.services.categories_cli:main"
+brains-bot-check-ai = "brains_bot.services.ai_check:main"
+brains-bot-dashboard = "brains_bot.dashboard.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Form"]

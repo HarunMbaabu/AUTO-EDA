@@ -1,0 +1,22 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+
+# Private data: never commit the workbook or derived data
+data/raw/
+data/processed/
+*.xlsx
+*.xls
+*.csv
+data/name_aliases.json

@@ -1,0 +1,68 @@
+{
+  "_comment": "Product categories for opportunity analysis. Stages: 1 foundation/early works, 2 structure/walling, 3 roofing, 4 plastering, 5 skimming/finishing prep, 6 painting under way, 7 complete/handed over. best_from..best_to is the ideal window; retrofit_to is the latest stage where retrofit options still make sense (null = none). Sync to the database with: uv run brains-bot-categories",
+  "categories": [
+    {
+      "key": "audio",
+      "name": "Home Audio & Multi-room",
+      "description": "Home cinema and multi-room audio systems, including in-ceiling and in-wall speakers, amplifiers and streaming (Prime Audiovisuals).",
+      "best_from": 1, "best_to": 4, "retrofit_to": 7,
+      "timing_note": "Speaker cabling and back boxes go in before plastering; after that, wireless and surface-mounted options remain."
+    },
+    {
+      "key": "painting",
+      "name": "Painting & Finishes",
+      "description": "Interior and exterior paint, premium and textured finishes, waterproofing and wallpapers.",
+      "best_from": 4, "best_to": 6, "retrofit_to": null,
+      "timing_note": "Paint and finish systems are chosen around plastering and skimming and applied before handover."
+    },
+    {
+      "key": "smart_home",
+      "name": "Smart Home Automation",
+      "description": "Smart lighting control, motorised blinds and curtains, smart climate control (AC, thermostats) and smart security (locks, cameras, gates).",
+      "best_from": 1, "best_to": 4, "retrofit_to": 7,
+      "timing_note": "Control wiring and conduit are easiest before plastering; wireless retrofit products exist for later stages."
+    },
+    {
+      "key": "cinema_addons",
+      "name": "Home Cinema Add-ons",
+      "description": "Automated reclining cinema seating, acoustic wall panels and star-field ceilings.",
+      "best_from": 2, "best_to": 6, "retrofit_to": 7,
+      "timing_note": "The room layout, acoustic treatment and ceiling are planned before finishes; seating can be added at the end."
+    },
+    {
+      "key": "joinery",
+      "name": "Custom Furniture & Joinery",
+      "description": "Built-in media walls and cabinets to house TVs and audio equipment, and other custom joinery.",
+      "best_from": 4, "best_to": 7, "retrofit_to": null,
+      "timing_note": "Measured and designed during finishing; installed near or after handover."
+    },
+    {
+      "key": "outdoor",
+      "name": "Outdoor Living",
+      "description": "Weatherproof outdoor speakers, landscape and garden lighting, outdoor projectors and TVs.",
+      "best_from": 3, "best_to": 7, "retrofit_to": null,
+      "timing_note": "External cabling is best laid with landscaping works, which usually come late in the build."
+    },
+    {
+      "key": "networking",
+      "name": "Networking & IT",
+      "description": "Structured cabling and whole-home Wi-Fi mesh systems, needed for streaming audio and 4K video.",
+      "best_from": 1, "best_to": 4, "retrofit_to": 7,
+      "timing_note": "Structured cabling goes in before plastering; mesh Wi-Fi can be added at any time."
+    },
+    {
+      "key": "flooring",
+      "name": "Flooring",
+      "description": "Acoustic underlays, hardwood floors and carpets, especially for media rooms and cinemas.",
+      "best_from": 4, "best_to": 6, "retrofit_to": 7,
+      "timing_note": "Floor finishes are chosen during finishing and laid before or around painting."
+    },
+    {
+      "key": "interior_design",
+      "name": "Interior Design",
+      "description": "Interior design services: space planning, finishes and colour schemes, lighting design, furnishing and décor.",
+      "best_from": 2, "best_to": 6, "retrofit_to": 7,
+      "timing_note": "Design decisions are best made before finishes go in; décor and styling remain possible after handover."
+    }
+  ]
+}

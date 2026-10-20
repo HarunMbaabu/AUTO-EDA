@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Opportunities{% endblock %}
+{% block content %}
+<h1>Opportunities</h1>
+<p class="muted lede">Who to pitch what, best first. The score adds points for timing, how recent the stage note is,
+a WhatsApp number, the AI analysis fit and a fitting catalog product, and takes points off for recent drafts and lost
+quotes. Projects too late for a category, or already quoted, are left out.</p>
+<form class="search" method="get" action="/opportunities">
+  <label for="category" class="muted">Category</label>
+  <select id="category" name="category" onchange="this.form.submit()">
+    <option value="">All (best category per project)</option>
+    {% for c in categories %}<option value="{{ c.key }}" {{ 'selected' if chosen and chosen.key == c.key }}>{{ c.name }}</option>{% endfor %}
+  </select>
+  <noscript><button type="submit">Show</button></noscript>
+</form>
+<div class="card flush">
+<table class="rows">
+  <thead><tr><th class="num">Score</th><th>Project</th><th>Category</th><th>Stage (recorded)</th><th>Why</th></tr></thead>
+  <tbody>
+  {% for o in items %}
+  <tr>
+    <td class="num"><strong>{{ o.score }}</strong></td>
+    <td><a href="/projects/{{ o.project_id }}">#{{ o.project_id }} {{ o.project }}</a><div class="muted small">{{ o.area or "" }}</div></td>
+    <td>{{ o.category }}{% if o.also %}<div class="muted small">also {{ o.also[:3] | join(', ') }}</div>{% endif %}</td>
+    <td>{{ o.stage }}<div class="muted small">{{ o.recorded_on.strftime('%d %b %Y') if o.recorded_on else "no date" }}{% if o.stale %} · <span class="badge warn">⚠ confirm</span>{% endif %}</div></td>
+    <td class="small">{{ o.reasons | join('; ') }}<div class="muted small">In Telegram: <code>/draft {{ o.project_id }} {{ o.category_key }}</code></div></td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="empty">No opportunities found.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

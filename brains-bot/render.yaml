@@ -1,0 +1,68 @@
+# Render Blueprint: an always-on background worker for the bot, the web dashboard, and a
+# PostgreSQL database they share. The bot uses long polling, so it needs no public URL (a
+# worker); the dashboard is a web service behind Telegram login.
+# Secrets marked `sync: false` are entered in the Render dashboard when the Blueprint is created.
+services:
+  - type: worker
+    name: brains-bot
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    preDeployCommand: alembic upgrade head
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: brains-bot-db
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ALLOWED_USER_IDS
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: AI_PROVIDER
+        value: mistral
+      - key: MISTRAL_MODEL
+        value: ministral-14b-latest
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: web
+    name: brains-bot-dashboard
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: brains-bot-dashboard
+    healthCheckPath: /healthz
+    autoDeploy: true
+    # Migrations run in the bot's pre-deploy step only, so two deploys never race on them.
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: brains-bot-db
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN  # verifies Telegram logins
+        fromService:
+          type: worker
+          name: brains-bot
+          envVarKey: TELEGRAM_BOT_TOKEN
+      - key: TELEGRAM_ALLOWED_USER_IDS  # who may log in: the same people as the bot
+        fromService:
+          type: worker
+          name: brains-bot
+          envVarKey: TELEGRAM_ALLOWED_USER_IDS
+      - key: DASHBOARD_SECRET  # signs the login cookie
+        generateValue: true
+      - key: LOG_LEVEL
+        value: INFO
+
+databases:
+  - name: brains-bot-db
+    plan: basic-256mb
+    databaseName: brains_bot
+    user: brains
+    postgresMajorVersion: "16"
+    ipAllowList: []  # internal connections only; add your IP to import from your computer
