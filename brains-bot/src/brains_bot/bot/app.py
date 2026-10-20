@@ -23,6 +23,7 @@ from brains_bot.bot import (
     import_handlers,
     outreach_handlers,
     project_handlers,
+    site_handlers,
 )
 from brains_bot.config import Settings
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
@@ -104,6 +105,7 @@ def build_application(settings: Settings) -> Application:
         "import": import_handlers.import_help,
         "newchat": chat_handlers.new_chat,
         "draft": outreach_handlers.draft,
+        "newsite": site_handlers.newsite,
         "top": followup_handlers.top,
         "followups": followup_handlers.followups_command,
         "reminders": followup_handlers.reminders,
@@ -114,6 +116,9 @@ def build_application(settings: Settings) -> Application:
         CallbackQueryHandler(
             outreach_handlers.draft_callback, pattern=outreach_handlers.DRAFT_CALLBACK
         )
+    )
+    application.add_handler(
+        CallbackQueryHandler(site_handlers.site_callback, pattern=site_handlers.SITE_CALLBACK)
     )
     application.add_handler(
         CallbackQueryHandler(

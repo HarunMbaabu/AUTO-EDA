@@ -11,6 +11,7 @@ from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
+from brains_bot.bot import site_handlers
 from brains_bot.bot.formatting import truncate
 from brains_bot.bot.handlers import _user_id, restricted
 from brains_bot.bot.project_handlers import _guard_db, _with_session
@@ -45,6 +46,10 @@ async def chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     assistant = context.bot_data.get("assistant")
     if assistant is None:
         await update.effective_message.reply_text(NOT_AVAILABLE)
+        return
+    if context.user_data.pop(site_handlers.AWAITING, False):
+        # The message after a bare /newsite is the site report, not a question.
+        await site_handlers.handle_report(update, context, update.effective_message.text or "")
         return
     question = (update.effective_message.text or "").strip()[:MAX_QUESTION_CHARS]
     if not question:

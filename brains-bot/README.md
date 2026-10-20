@@ -25,6 +25,7 @@ dashboard.
 | `/top [category]`  | Authorized     | Best opportunities to pitch, with the reasons for each score |
 | `/followups`       | Authorized     | This week's summary: who to pitch, sent drafts with no reply, open quotes to chase |
 | `/reminders on\|off` | Authorized   | The weekly summary, sent Mondays at 08:00 Nairobi time (on by default) |
+| `/newsite <message>` | Authorized | Add a project by pasting a WhatsApp site report; check what was understood, then tap Save |
 | Any plain message | Authorized | Chat mode: ask in your own words, e.g. "which projects in Ruiru are at painting stage?" |
 | `/newchat`         | Authorized     | Starts a new conversation (forgets earlier questions) |
 | `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
@@ -152,6 +153,24 @@ otherwise those fields stay empty.
 
 Re-running with the same file does nothing; `--force` re-imports without creating duplicates.
 Projects that disappear from a newer workbook are flagged, not deleted.
+
+## Adding sites from WhatsApp (`/newsite`)
+
+Paste a site report after `/newsite` (or send `/newsite`, then paste the message):
+
+```
+/newsite This a project at Runda mumwe Riaka they have finished on the building phase ...
+the contractor is Maina 0721462244. https://maps.app.goo.gl/...
+```
+
+The bot finds the phone number(s) and the Google Maps link itself; the AI only sees the message
+with contact details removed and returns the site name, area, city and the contact's name and
+role. The bot shows what it understood with **✅ Save** / **✖ Cancel**; nothing is stored before
+Save. A saved site becomes a normal project: the person named is its contact person (usable by
+`/draft`), the whole message is its first note (so the stage is read from it), and the visit
+date is today. Sites added this way are not flagged when a newer workbook is uploaded, because
+they were never in it. Mention the stage in plain words (foundation, walling, roofing,
+plastering, skimming, painting, handed over) so timing and ranking can use it.
 
 ## WhatsApp drafts (`/draft`)
 
