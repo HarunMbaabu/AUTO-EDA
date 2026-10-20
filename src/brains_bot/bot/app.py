@@ -24,6 +24,7 @@ from brains_bot.bot import (
     import_handlers,
     outreach_handlers,
     project_handlers,
+    repeat_handlers,
     site_handlers,
 )
 from brains_bot.config import Settings
@@ -108,6 +109,8 @@ def build_application(settings: Settings) -> Application:
         "draft": outreach_handlers.draft,
         "newsite": site_handlers.newsite,
         "contacts": contact_handlers.contacts_command,
+        "repeats": repeat_handlers.repeats_command,
+        "merge": repeat_handlers.merge_command,
         "top": followup_handlers.top,
         "followups": followup_handlers.followups_command,
         "reminders": followup_handlers.reminders,
@@ -121,6 +124,9 @@ def build_application(settings: Settings) -> Application:
     )
     application.add_handler(
         CallbackQueryHandler(site_handlers.site_callback, pattern=site_handlers.SITE_CALLBACK)
+    )
+    application.add_handler(
+        CallbackQueryHandler(repeat_handlers.merge_callback, pattern=repeat_handlers.MERGE_CALLBACK)
     )
     application.add_handler(
         CallbackQueryHandler(

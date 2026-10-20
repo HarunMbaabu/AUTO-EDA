@@ -29,7 +29,7 @@ from brains_bot.database.models import (
     ProjectNote,
 )
 from brains_bot.importers import normalize as n
-from brains_bot.services import contacts
+from brains_bot.services import contacts, repeats
 from brains_bot.services.analysis import AnalysisError
 
 log = logging.getLogger(__name__)
@@ -90,6 +90,9 @@ class SiteDraft:
     company: str | None = None
     existing_contact_id: int | None = None  # a "contact" entry whose number is already known
     existing_contact_name: str | None = None
+    # Not the same number, but the same contact name in the same area: maybe a repeat.
+    possible_project_id: int | None = None
+    possible_name: str | None = None
 
 
 def _clean(value: Any, limit: int = 120) -> str | None:
@@ -323,6 +326,13 @@ def match_existing(session: Session, drafts: list[SiteDraft]) -> None:
         ).first()
         if found is not None:
             draft.existing_project_id, draft.existing_name = found
+    for draft in drafts:
+        if draft.kind == "site" and draft.existing_project_id is None:
+            maybe = repeats.same_name_and_area(
+                session, draft.contact_name, draft.area, draft.site_name, draft.message
+            )
+            if maybe is not None:
+                draft.possible_project_id, draft.possible_name = maybe
 
 
 def _contact(session: Session, draft: SiteDraft, project_key: str) -> Contact:
@@ -388,8 +398,20 @@ def save(session: Session, draft: SiteDraft, today: date, actor: int | None = No
             )
             if draft.map_url and not project.google_location_url:
                 project.google_location_url = draft.map_url
-            for contact in _project_contacts_with(session, project.id, draft.phone.numbers):
+            known = _project_contacts_with(session, project.id, draft.phone.numbers)
+            for contact in known:
                 contacts.fill(contact, draft.trade, draft.company, None)
+            if draft.phone.numbers and not known:
+                # A new number for this site (e.g. Airtel this time, Safaricom before): link it,
+                # so the next follow-up with either number is recognised.
+                contact = _contact(session, draft, project.source_key)
+                contacts.fill(contact, draft.trade or "site_contact", draft.company, None)
+                session.add(
+                    ProjectContact(
+                        project_id=project.id, contact_id=contact.id, role="contact_person",
+                        manual=True,
+                    )
+                )  # fmt: skip
             session.flush()
             return Saved("follow_up", project.id, project.name)
     key = f"{SOURCE_PREFIX}{uuid.uuid4().hex[:12]}"

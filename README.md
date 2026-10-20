@@ -27,6 +27,8 @@ dashboard.
 | `/reminders on\|off` | Authorized   | The weekly summary, sent Mondays at 08:00 Nairobi time (on by default) |
 | `/newsite <message>` | Authorized | Add projects by pasting a WhatsApp site report (one site or a numbered list); follow-ups are matched by phone number; check, then tap Save |
 | `/contacts [trade] [area]` | Authorized | The contacts directory by trade, e.g. `/contacts contractor Migaa`, `/contacts interior designer`; `/contacts` alone shows the counts per trade |
+| `/repeats` | Authorized | Projects that look like the same site entered twice (same number, or same contact name in the same area), with the `/merge` command for each |
+| `/merge <repeat> <keep>` | Authorized | Moves a repeat project's notes, people and numbers, drafts and quotes into the project kept, after a confirm button |
 | Any plain message | Authorized | Chat mode: ask in your own words, e.g. "which projects in Ruiru are at painting stage?" |
 | `/newchat`         | Authorized     | Starts a new conversation (forgets earlier questions) |
 | `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
@@ -178,6 +180,20 @@ Save. A saved site becomes a normal project: the person named is its contact per
 date is the one written in the message (today if none). Sites added this way are not flagged when a newer workbook is uploaded, because
 they were never in it. Mention the stage in plain words (foundation, walling, roofing,
 plastering, skimming, painting, handed over) so timing and ranking can use it.
+
+### Repeat sites (a contact with two numbers)
+
+People often give a Safaricom number on one visit and an Airtel number on the next. When a
+`/newsite` entry's number is new but the **contact's first name and the area match** an
+existing project, the preview shows `POSSIBLE REPEAT → #N` with two buttons: **Save (repeats
+as follow-ups)** adds the report as a dated note on #N and links the new number to it (so
+either number is recognised next time); **Save repeats as new** creates a separate project.
+
+For repeats already in the database, `/repeats` lists projects sharing a contact number or a
+contact name and area, and `/merge 214 37` moves everything on #214 into #37 and removes #214
+(a confirm button comes first; it cannot be undone). A merged workbook project stays merged:
+later imports skip its rows. Notes and numbers added from Telegram are kept when a workbook is
+re-imported.
 
 ### Contacts for future work (contractors, interior designers, developers, ...)
 
