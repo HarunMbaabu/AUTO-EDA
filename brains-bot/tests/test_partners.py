@@ -42,7 +42,7 @@ def test_categories_come_in_groups(factory):
         assert "solar" in {c.key for c in groups["Tech & Entertainment"]}
         finishes = partners.category_keys(s, "finishes")
         assert set(finishes) == {"painting", "flooring", "joinery", "interior_design",
-                                 "lighting", "curtains"}  # fmt: skip
+                                 "lighting", "curtains", "waterproofing"}  # fmt: skip
         assert partners.category_keys(s, "interior design") == ["interior_design"]
         assert partners.category_keys(s, "Karen") is None
 

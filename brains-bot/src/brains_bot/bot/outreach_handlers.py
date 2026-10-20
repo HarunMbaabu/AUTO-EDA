@@ -73,6 +73,28 @@ def _phones(contact: Contact | None) -> list[str]:
     return [str(n) for n in contact.phone_candidates if str(n).startswith("+254")][:3]
 
 
+def draft_message(
+    project: Project, category, contact: Contact | None, created: OutreachDraft
+) -> tuple[str, InlineKeyboardMarkup | None]:
+    """The draft as shown in Telegram, with its Send buttons."""
+    phones = _phones(contact)
+    to = contact.name if contact else "no contact person on record"
+    numbers = ", ".join(mask_phone(n) for n in phones) or "no valid WhatsApp number"
+    lines = [
+        f"Draft for #{project.id} {project.name} · {category.name}",
+        f"To: {to} ({numbers})",
+        "⚠ Marketing consent is unknown. Only send if they have agreed to hear from you.",
+        "",
+        created.text,
+        "",
+        "Tap Send to open it in WhatsApp, where you can edit it before sending."
+        if phones
+        else "There is no valid number on record, so there is no WhatsApp link. "
+        f"Check /project {project.id}.",
+    ]
+    return truncate("\n".join(lines), 4000), _buttons(created, phones)
+
+
 @restricted("draft")
 async def draft(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await _guard_db(update, context):
@@ -121,22 +143,8 @@ async def draft(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
-    phones = _phones(contact)
-    to = contact.name if contact else "no contact person on record"
-    numbers = ", ".join(mask_phone(n) for n in phones) or "no valid WhatsApp number"
-    lines = [
-        f"Draft for #{project.id} {project.name} · {category.name}",
-        f"To: {to} ({numbers})",
-        "⚠ Marketing consent is unknown. Only send if they have agreed to hear from you.",
-        "",
-        created.text,
-        "",
-        "Tap Send to open it in WhatsApp, where you can edit it before sending."
-        if phones
-        else "There is no valid number on record, so there is no WhatsApp link. "
-        f"Check /project {project.id}.",
-    ]
-    await status.edit_text(truncate("\n".join(lines), 4000), reply_markup=_buttons(created, phones))
+    text, buttons = draft_message(project, category, contact, created)
+    await status.edit_text(text, reply_markup=buttons)
 
 
 async def draft_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

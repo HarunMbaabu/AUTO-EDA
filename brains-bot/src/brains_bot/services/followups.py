@@ -112,7 +112,11 @@ def digest(session: Session, today: date) -> str:
                   for q in quotes[:10]]  # fmt: skip
     else:
         lines.append("- Nothing to chase.")
-    lines += ["", "Full ranking: /top · turn this weekly message off: /reminders off"]
+    lines += [
+        "",
+        "Ready-to-send messages: /followups drafts (sent with this summary on Mondays)",
+        "Full ranking: /top · turn this weekly message off: /reminders off",
+    ]
     return "\n".join(lines)
 
 
