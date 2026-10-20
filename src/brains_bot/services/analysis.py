@@ -208,7 +208,7 @@ def build_context(
             .order_by(ProjectNote.observed_date.desc().nulls_last(), ProjectNote.id.desc())
         )
     ]
-    stage = detect_stage(notes)
+    stage = detect_stage(notes[::-1])  # oldest first, as everywhere else
     window = CategoryWindow(
         category.name, category.best_from, category.best_to, category.retrofit_to
     )

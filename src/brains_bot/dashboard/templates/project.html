@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_stage_form.html" import stage_form with context %}
 {% block title %}#{{ d.summary.id }} {{ d.summary.name }}{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="/projects">Projects</a> ›</p>
@@ -12,6 +13,7 @@
     <h3>Stage</h3>
     <p class="big">{{ stage.label }}</p>
     {% if stage.recorded_on %}<p class="muted small">From the note of {{ stage.recorded_on.strftime('%d %b %Y') }}: “{{ stage.evidence }}”</p>{% endif %}
+    {{ stage_form(d.summary.id, stage.label, request.url.path, label="Update the stage", warn=stage_stale) }}
     <h3>People</h3>
     {% if d.contacts %}<table><tbody>{% for c in d.contacts %}<tr><td class="muted">{{ c.role.replace('_', ' ') }}</td><td>{{ c.name }}</td><td>{% if c.phone_e164 %}{{ c.phone_e164 | phone }}{% elif c.phone_status == 'multiple' %}{{ c.phone_count }} numbers{% else %}<span class="muted">{{ c.phone_status }}</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
     {% else %}<p class="empty">No people on record.</p>{% endif %}

@@ -1,0 +1,16 @@
+{# A small "update the stage" form; opens from a badge or link. Needs csrf in the context. #}
+{% macro stage_form(project_id, current, back, label="update", warn=False) %}
+<details class="stage-edit">
+  <summary>{% if warn %}<span class="badge warn" title="Recorded more than 4 months ago: confirm it">⚠ confirm</span>{% else %}<span class="link small">{{ label }}</span>{% endif %}</summary>
+  <form method="post" action="/projects/{{ project_id }}/stage" class="stage-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <label>Stage now
+      <select name="stage">{% for n, name in stage_choices %}<option value="{{ n }}"{% if name == current %} selected{% endif %}>{{ name }}</option>{% endfor %}</select>
+    </label>
+    <label>Seen or told on <input type="date" name="on" value="{{ today.isoformat() }}" max="{{ today.isoformat() }}"></label>
+    <label>Note (optional) <input type="text" name="note" maxlength="500" placeholder="e.g. confirmed on a call with the contractor"></label>
+    <button type="submit">Save stage</button>
+  </form>
+</details>
+{% endmacro %}

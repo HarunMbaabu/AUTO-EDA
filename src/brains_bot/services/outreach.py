@@ -161,9 +161,9 @@ def _names(session: Session) -> dict[str, str]:
 def draft_request(session: Session, target: DraftTarget, today: date) -> dict[str, Any]:
     notes = list(
         session.execute(
-            select(ProjectNote.observed_date, ProjectNote.text).where(
-                ProjectNote.project_id == target.project.id
-            )
+            select(ProjectNote.observed_date, ProjectNote.text)
+            .where(ProjectNote.project_id == target.project.id)
+            .order_by(ProjectNote.id)
         )
     )
     stage = detect_stage(notes)

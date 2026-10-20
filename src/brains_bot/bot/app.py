@@ -28,6 +28,7 @@ from brains_bot.bot import (
     project_handlers,
     repeat_handlers,
     site_handlers,
+    stage_handlers,
 )
 from brains_bot.config import Settings
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
@@ -116,6 +117,8 @@ def build_application(settings: Settings) -> Application:
         "partner": partner_handlers.partner_command,
         "partners": partner_handlers.partners_command,
         "brochures": brochure_handlers.brochures_command,
+        "stage": stage_handlers.stage_command,
+        "plan": stage_handlers.plan_command,
         "top": followup_handlers.top,
         "followups": followup_handlers.followups_command,
         "reminders": followup_handlers.reminders,
@@ -147,6 +150,9 @@ def build_application(settings: Settings) -> Application:
         CallbackQueryHandler(
             brochure_handlers.send_callback, pattern=brochure_handlers.SEND_CALLBACK
         )
+    )
+    application.add_handler(
+        CallbackQueryHandler(stage_handlers.stage_callback, pattern=stage_handlers.STAGE_CALLBACK)
     )
     application.add_handler(
         CallbackQueryHandler(

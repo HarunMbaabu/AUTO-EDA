@@ -99,3 +99,18 @@ button.link { background: none; color: var(--accent-ink); padding: 0 4px; font-s
   .topbar { padding: 10px 16px; gap: 10px; } .who { margin-left: 0; width: 100%; }
   .grid2 { grid-template-columns: 1fr; } .tile .value { font-size: 24px; }
 }
+
+/* Stage confirmation: a badge or link that opens a small form */
+details.stage-edit { margin-top: 4px; }
+details.stage-edit summary { list-style: none; display: inline-block; }
+details.stage-edit summary::-webkit-details-marker { display: none; }
+.stage-form { display: grid; gap: 6px; margin-top: 8px; padding: 10px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--page); max-width: 280px; font-size: 13px; }
+.stage-form label { display: grid; gap: 2px; color: var(--text-muted); }
+.stage-form select, .stage-form input { font: inherit; padding: 4px 6px; }
+.link { color: var(--accent-ink); }
+
+/* Plan page */
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 16px; }
+.tabs a { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); text-decoration: none; }
+.section > .card + .card { margin-top: 12px; }

@@ -79,9 +79,37 @@ def _stage_in(sentence: str) -> int | None:
     return found
 
 
+# A stage confirmed by a person (dashboard or /stage) starts with this; see confirmed_note().
+CONFIRMED = "Stage confirmed:"
+# How a confirmed stage is written, in words the patterns above recognise.
+STAGE_WORDS = {1: "foundation", 2: "walling", 3: "roofing", 4: "plastering", 5: "skimming",
+               6: "painting ongoing", 7: "handed over"}  # fmt: skip
+
+
+def confirmed_note(stage: int, note: str | None = None) -> str:
+    """'Stage confirmed: plastering.' plus the person's note on its own line."""
+    text = f"{CONFIRMED} {STAGE_WORDS[stage]}."
+    return f"{text}\n{note.strip()}" if note and note.strip() else text
+
+
+def _confirmed(text: str) -> int | None:
+    if not text.startswith(CONFIRMED):
+        return None
+    word = text[len(CONFIRMED) :].split(".", 1)[0].strip()
+    return next((n for n, w in STAGE_WORDS.items() if w == word), None)
+
+
 def detect_stage(notes: list[tuple[date | None, str]]) -> StageResult:
-    """Most advanced stage mentioned in any note, with the sentence and note date."""
+    """Most advanced stage mentioned in any note (oldest first), with the sentence and note
+    date. A stage a person confirmed is the latest word: it can correct an earlier reading
+    downwards, and only notes dated after it can move the stage on."""
     best = StageResult(None, None, None)
+    # (date, position, stage): on the same day the later entry wins.
+    marked = [(d, i, _confirmed(t)) for i, (d, t) in enumerate(notes) if d and _confirmed(t)]
+    if marked:
+        on, _, stage = max(marked)
+        best = StageResult(stage, f"{CONFIRMED} {STAGE_WORDS[stage]}", on)
+        notes = [(d, t) for d, t in notes if d and d > on]
     for recorded_on, text in notes:
         for sentence in _sentences(text):
             stage = _stage_in(sentence)

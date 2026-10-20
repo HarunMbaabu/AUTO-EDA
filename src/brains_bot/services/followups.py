@@ -93,7 +93,7 @@ def digest(session: Session, today: date) -> str:
     lines.append("Top opportunities to pitch")
     if top:
         for o in top:
-            confirm = " (confirm stage first)" if o.stale else ""
+            confirm = f" (stage note is old: /stage {o.project_id})" if o.stale else ""
             lines.append(f"- #{o.project_id} {o.project}: {o.category}, score {o.score}{confirm}")
             lines.append(f"  /draft {o.project_id} {o.category_key}")
     else:
@@ -115,6 +115,7 @@ def digest(session: Session, today: date) -> str:
     lines += [
         "",
         "Ready-to-send messages: /followups drafts (sent with this summary on Mondays)",
+        "This week and month in full: /plan · confirm a stage: /stage <number>",
         "Full ranking: /top · turn this weekly message off: /reminders off",
     ]
     return "\n".join(lines)

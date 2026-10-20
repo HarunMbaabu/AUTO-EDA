@@ -39,7 +39,7 @@ def format_top(items: list[opportunities.Opportunity], title: str) -> str:
     ]
     for n, o in enumerate(items, start=1):
         when = fmt_date(o.recorded_on) if o.recorded_on else "no date"
-        confirm = ", confirm first" if o.stale else ""
+        confirm = f", confirm: /stage {o.project_id}" if o.stale else ""
         lines.append(f"{n}. #{o.project_id} {o.project}" + (f" · {o.area}" if o.area else ""))
         lines.append(f"   {o.category} · score {o.score} · {o.stage} ({when}{confirm})")
         if o.also:

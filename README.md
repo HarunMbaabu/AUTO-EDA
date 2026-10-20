@@ -33,6 +33,8 @@ dashboard.
 | `/partners [category or group] [area]` | Authorized | Your partners with their rates, e.g. `/partners interior design`, `/partners finishes Kiambu` |
 | Send a PDF or photo | Authorized | A brochure: read its products into a catalog spreadsheet to check, keep it in the library, or add the company as a partner |
 | `/brochures [category, group or supplier]` | Authorized | The brochure library; tap one to get the file and forward it to a customer |
+| `/stage <number> [stage] [note]` | Authorized | Confirm or correct a project's construction stage (`/stage 349 skimming`); `/stage 349` alone shows buttons |
+| `/plan [week\|month\|later]` | Authorized | What to do this week (chase replies and quotes, confirm old stages, pitch now), this month (visits for sites coming into a window, follow-ups falling due, estimated paint starts) or in the next 3 months |
 | Any plain message | Authorized | Chat mode: ask in your own words, e.g. "which projects in Ruiru are at painting stage?" |
 | `/newchat`         | Authorized     | Starts a new conversation (forgets earlier questions) |
 | `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
@@ -223,6 +225,23 @@ contractor, company, or "site contact" for the contact person); a later note tha
 specific trade replaces "site contact" or "company".
 Find people with `/contacts contractor Migaa`, by asking in chat ("which interior designers do
 we know?"), or on the dashboard's **Contacts** page, filtered by trade and area.
+
+## Confirming stages and the plan
+
+A stage read from a note more than 4 months old is marked **⚠ confirm**. On the dashboard,
+click the badge (on the overview, the Plan page or a project page) to set the stage as it is
+now, the date you saw it or were told, and an optional note; in Telegram use `/stage 349
+skimming` or `/stage 349` and tap the stage. A confirmed stage is the latest word on that site:
+it can correct an earlier reading downwards, and only later notes move it on. Timing, ranking
+and drafts use it straight away.
+
+The dashboard's **Plan** page (and `/plan` in Telegram) lists what needs doing:
+
+- **This week:** replies to chase, quotes to chase, stages to confirm before pitching, and the
+  best opportunities to pitch now (with the `/draft` command for each).
+- **This month:** visits for sites one stage before a category's best window, drafts and quotes
+  that fall due for chasing, and workbook paint-start estimates in the month.
+- **Next 3 months:** sites two stages before a window, and later paint-start estimates.
 
 ## Categories and partners
 
