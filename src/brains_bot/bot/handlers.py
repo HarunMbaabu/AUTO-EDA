@@ -29,6 +29,7 @@ PRIVATE_COMMANDS = {
     "project": "Show one project, e.g. /project 12",
     "categories": "Product categories and their best timing",
     "analyze": "Claude analysis for a project and category, e.g. /analyze 12 audio",
+    "draft": "Draft a WhatsApp message for a project, e.g. /draft 205 audio",
     "import": "How to load or update the data: send the workbook (.xlsx) as a file",
     "newchat": "Start a new conversation (or just ask a question in plain words)",
 }

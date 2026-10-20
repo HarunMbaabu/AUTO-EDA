@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}Brains Bot{% endblock %} · Brains Bot</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">Brains Bot <span>Command Center</span></a>
+  {% if user %}
+  <nav>
+    <a href="/" class="{{ 'active' if request.url.path == '/' }}">Overview</a>
+    <a href="/projects" class="{{ 'active' if request.url.path.startswith('/projects') }}">Projects</a>
+  </nav>
+  <div class="who">{{ user.name or user.id }} · <a href="/logout">Log out</a></div>
+  {% endif %}
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>
