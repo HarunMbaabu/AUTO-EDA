@@ -414,7 +414,11 @@ STALE_REASON = "not found in the latest import; it may have been removed from th
 def _flag_stale_projects(session: Session, stats: ImportStats, batch: ImportBatch) -> None:
     """Projects from earlier imports are kept (history may point at them), but flagged."""
     stale = session.scalars(
-        select(Project).where((Project.last_batch_id != batch.id) | Project.last_batch_id.is_(None))
+        select(Project).where(
+            (Project.last_batch_id != batch.id) | Project.last_batch_id.is_(None),
+            # Projects added from Telegram (/newsite) were never in the workbook.
+            ~Project.source_key.startswith("tg:"),
+        )
     )
     for project in stale:
         if STALE_REASON not in project.review_reasons:

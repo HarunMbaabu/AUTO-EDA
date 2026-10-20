@@ -30,6 +30,7 @@ PRIVATE_COMMANDS = {
     "categories": "Product categories and their best timing",
     "analyze": "Claude analysis for a project and category, e.g. /analyze 12 audio",
     "draft": "Draft a WhatsApp message for a project, e.g. /draft 205 audio",
+    "newsite": "Add a project by pasting a WhatsApp site report",
     "top": "Best opportunities to pitch, with reasons; /top audio for one category",
     "followups": "Who to pitch and who to chase this week",
     "reminders": "Weekly Monday summary on or off: /reminders off",
