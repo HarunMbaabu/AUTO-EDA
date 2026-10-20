@@ -52,7 +52,7 @@ def test_extract_falls_back_when_the_ai_says_little():
 def test_save_creates_a_project_the_rest_of_the_bot_can_use(factory, tmp_path):
     (draft,) = sites.extract(FakeTransport(text(json.dumps(ANSWER))), REPORT)
     with session_scope(factory) as s:
-        project = sites.save(s, draft, date(2026, 10, 20))
+        project = s.get(Project, sites.save(s, draft, date(2026, 10, 20)).id)
         assert project.source_key.startswith("tg:") and project.site_visit_date == date(
             2026, 10, 20
         )
@@ -100,7 +100,7 @@ async def test_newsite_preview_then_save(factory, context):
     tap.callback_query = query
     await site_handlers.site_callback(tap, context)
     saved = query.edit_message_text.await_args.args[0]
-    assert saved.startswith("Saved: 1 new project(s), 0 follow-up note(s).") and "/draft " in saved
+    assert saved.startswith("Saved: 1 new project(s).") and "/draft " in saved
     await site_handlers.site_callback(tap, context)  # a second tap does not save twice
     with session_scope(factory) as s:
         assert len(s.scalars(select(Project)).all()) == 1
@@ -171,7 +171,8 @@ def test_a_numbered_list_becomes_several_sites_and_follow_ups_match_by_phone(fac
     with session_scope(factory) as s:
         sites.match_existing(s, drafts)
         assert all(d.existing_project_id is None for d in drafts)
-        ken = sites.save(s, drafts[2], date(2026, 10, 1))  # Ken Villa saved earlier
+        ken = sites.save(s, drafts[2], date(2026, 10, 1))
+        assert ken.kind == "new_site"  # Ken Villa saved earlier
 
     later = sites.extract(FakeTransport(text(json.dumps(MULTI_ANSWER))), MULTI)
     with session_scope(factory) as s:
@@ -232,7 +233,7 @@ def test_visit_date_comes_from_the_message(factory):
         date(2026, 10, 15),
     ]
     with session_scope(factory) as s:
-        project = sites.save(s, drafts[0], today)
+        project = s.get(Project, sites.save(s, drafts[0], today).id)
         assert project.site_visit_date == date(2026, 10, 17)
         note = s.scalar(select(ProjectNote).where(ProjectNote.project_id == project.id))
         assert note.observed_date == date(2026, 10, 17)

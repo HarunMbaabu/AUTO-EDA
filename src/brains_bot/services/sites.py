@@ -29,6 +29,7 @@ from brains_bot.database.models import (
     ProjectNote,
 )
 from brains_bot.importers import normalize as n
+from brains_bot.services import contacts
 from brains_bot.services.analysis import AnalysisError
 
 log = logging.getLogger(__name__)
@@ -59,6 +60,10 @@ if the item starts with only a person's name, "<that name> project"; never inven
 - "role_description": the person's role in a few words as stated (e.g. "paint contractor", \
 "caretaker", "interior designer"), or null
 - "visit_date": YYYY-MM-DD if this item states its own visit date, else null
+- "kind": "contact" if the item records a person or company for future work with no specific \
+building project (e.g. "met a contractor, good contact for future projects"); otherwise "site"
+- "trade": the person's trade, one of {trades}, or null
+- "company": the company they work for if named (e.g. "Florissant Construction"), or null
 Also add a top-level key "visit_date": the date the visits happened if the report states one \
 (e.g. "20/10/2026", "13th Oct", "yesterday", "on Monday"), as YYYY-MM-DD, else null. Today is \
 {today}; Kenyan dates are written day first.
@@ -80,6 +85,11 @@ class SiteDraft:
     existing_project_id: int | None = None  # set when this is a follow-up on a known project
     existing_name: str | None = None
     visit_date: date | None = None  # stated in the message; None means "today"
+    kind: str = "site"  # "site" or "contact" (a person for future work, no site yet)
+    trade: str | None = None
+    company: str | None = None
+    existing_contact_id: int | None = None  # a "contact" entry whose number is already known
+    existing_contact_name: str | None = None
 
 
 def _clean(value: Any, limit: int = 120) -> str | None:
@@ -217,7 +227,11 @@ def extract(transport: Any, message: str, today: date | None = None) -> list[Sit
         "messages": [
             {
                 "role": "system",
-                "content": EXTRACT_PROMPT.format(count=len(items), today=today.isoformat()),
+                "content": EXTRACT_PROMPT.format(
+                    count=len(items),
+                    today=today.isoformat(),
+                    trades=", ".join(f'"{key}"' for key in contacts.TRADES),
+                ),
             },
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ],
@@ -266,15 +280,28 @@ def extract(transport: Any, message: str, today: date | None = None) -> list[Sit
                     or _visit_date(fields.get("visit_date"), today)
                     or report_date
                 ),
+                kind="contact" if fields.get("kind") == "contact" else "site",
+                trade=(
+                    contacts.trade_key(_clean(fields.get("trade")))
+                    or contacts.trade_key(_clean(fields.get("role_description")))
+                    or (role if role in ("contractor", "architect", "owner") else None)
+                ),
+                company=_clean(fields.get("company")),
             )
         )
     return drafts
 
 
 def match_existing(session: Session, drafts: list[SiteDraft]) -> None:
-    """Mark drafts whose phone number already belongs to a project as follow-ups on it."""
+    """Mark drafts whose phone number is already known: a site entry becomes a follow-up on
+    that project, a contact entry adds to that person's directory entry."""
     for draft in drafts:
         if not draft.phone.numbers:
+            continue
+        if draft.kind == "contact":
+            known = contacts.by_phone(session, draft.phone.numbers)
+            if known is not None:
+                draft.existing_contact_id, draft.existing_contact_name = known.id, known.name
             continue
         found = session.execute(
             select(Project.id, Project.name)
@@ -331,10 +358,24 @@ def _note(draft: SiteDraft) -> str:
     return draft.message + (f"\n(Contact: {who})" if who and who not in draft.message else "")
 
 
-def save(session: Session, draft: SiteDraft, today: date) -> Project:
-    """A follow-up adds a dated note to its project; anything else becomes a new project. The
-    visit date is the one stated in the message, else today."""
+@dataclass
+class Saved:
+    kind: str  # "new_site" | "follow_up" | "new_contact" | "contact_note"
+    id: int  # project id, or contact id for contacts
+    name: str
+
+
+def save(session: Session, draft: SiteDraft, today: date, actor: int | None = None) -> Saved:
+    """A contact entry goes to the contacts directory; a follow-up adds a dated note to its
+    project; anything else becomes a new project. The visit date is the one stated in the
+    message, else today."""
     today = draft.visit_date or today
+    if draft.kind == "contact":
+        contact, is_new = contacts.save_contact(
+            session, draft.contact_name, draft.phone, draft.trade, draft.company,
+            draft.area, _note(draft), today, actor,
+        )  # fmt: skip
+        return Saved("new_contact" if is_new else "contact_note", contact.id, contact.name)
     if draft.existing_project_id is not None:
         project = session.get(Project, draft.existing_project_id)
         if project is not None:
@@ -345,8 +386,10 @@ def save(session: Session, draft: SiteDraft, today: date) -> Project:
             )
             if draft.map_url and not project.google_location_url:
                 project.google_location_url = draft.map_url
+            for contact in _project_contacts_with(session, project.id, draft.phone.numbers):
+                contacts.fill(contact, draft.trade, draft.company, None)
             session.flush()
-            return project
+            return Saved("follow_up", project.id, project.name)
     key = f"{SOURCE_PREFIX}{uuid.uuid4().hex[:12]}"
     project = Project(
         source_key=key,
@@ -360,6 +403,7 @@ def save(session: Session, draft: SiteDraft, today: date) -> Project:
     session.flush()
     if draft.contact_name or draft.phone.numbers:
         contact = _contact(session, draft, key)
+        contacts.fill(contact, draft.trade, draft.company, draft.area)
         # The person to talk to is the contact person, whatever their job on site, so drafts
         # and follow-ups find them; a named owner is also recorded as the owner.
         roles = {"contact_person"} | ({"owner"} if draft.contact_role == "owner" else set())
@@ -369,4 +413,22 @@ def save(session: Session, draft: SiteDraft, today: date) -> Project:
         ProjectNote(project_id=project.id, field=NOTE_FIELD, text=_note(draft), observed_date=today)
     )
     session.flush()
-    return project
+    return Saved("new_site", project.id, project.name)
+
+
+def _project_contacts_with(session: Session, project_id: int, numbers: list[str]) -> list[Contact]:
+    if not numbers:
+        return []
+    return list(
+        session.scalars(
+            select(Contact)
+            .join(ProjectContact, ProjectContact.contact_id == Contact.id)
+            .where(
+                ProjectContact.project_id == project_id,
+                or_(
+                    Contact.phone_e164.in_(numbers),
+                    *[Contact.phone_candidates.contains([x]) for x in numbers],
+                ),
+            )
+        )
+    )

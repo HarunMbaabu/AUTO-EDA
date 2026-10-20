@@ -109,6 +109,10 @@ class Contact(TimestampMixin, Base):
     # valid | multiple | invalid | placeholder | missing
     phone_status: Mapped[str] = mapped_column(String(20), default="missing")
     phone_candidates: Mapped[list[Any]] = mapped_column(default=list)
+    # The contacts directory: what the person does, who they work for, where they work.
+    trade: Mapped[str | None] = mapped_column(String(40), index=True)  # see services/contacts.py
+    company: Mapped[str | None] = mapped_column(Text)
+    area: Mapped[str | None] = mapped_column(Text)
 
 
 class ProjectContact(Base):
@@ -310,3 +314,18 @@ class OperatorSetting(TimestampMixin, Base):
 
     telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     weekly_digest: Mapped[bool] = mapped_column(default=True)
+
+
+class ContactNote(Base):
+    """A dated note about a person (e.g. "good contact for future projects"), not a site."""
+
+    __tablename__ = "contact_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contact_id: Mapped[int] = mapped_column(
+        ForeignKey("contacts.id", ondelete="CASCADE"), index=True
+    )
+    text: Mapped[str] = mapped_column(Text)
+    observed_date: Mapped[date | None] = mapped_column(Date)
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

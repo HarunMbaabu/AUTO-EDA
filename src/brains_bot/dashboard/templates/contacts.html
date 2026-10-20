@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Contacts{% endblock %}
+{% block content %}
+<h1>Contacts</h1>
+<form class="search" method="get" action="/contacts">
+  <select name="trade" aria-label="Trade">
+    <option value="">All trades</option>
+    {% for key, name in trades.items() %}<option value="{{ key }}"{% if key == trade %} selected{% endif %}>{{ name }}</option>{% endfor %}
+  </select>
+  <input type="search" name="q" value="{{ q }}" placeholder="Area, company or name" aria-label="Search contacts">
+  <button type="submit">Filter</button>
+  {% if q or trade %}<a href="/contacts">Clear</a>{% endif %}
+</form>
+<p class="muted">
+  {% for t, c in counts %}<a href="/contacts?trade={{ t }}">{{ label(t) }} {{ c }}</a>{% if not loop.last %} · {% endif %}{% else %}No contacts with a trade yet.{% endfor %}
+</p>
+<p class="muted">{{ total }} contact{{ '' if total == 1 else 's' }}{% if trade %} · {{ label(trade) }}{% endif %}{% if q %} matching “{{ q }}”{% endif %}, latest note first.{% if total > entries|length %} Showing {{ entries|length }}.{% endif %}</p>
+<div class="card flush">
+<table class="rows">
+  <thead><tr><th>Name</th><th>Trade</th><th>Company / area</th><th>Phone</th><th>Sites</th><th>Latest note</th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+  <tr>
+    <td>{{ e.contact.name }}</td>
+    <td>{{ label(e.contact.trade) }}</td>
+    <td>{{ e.contact.company or "—" }}<div class="muted small">{{ e.contact.area or "" }}</div></td>
+    <td>{{ e.contact.phone_e164 | phone if e.contact.phone_e164 else "—" }}</td>
+    <td>{% for pid, name in e.projects[:3] %}<a href="/projects/{{ pid }}">#{{ pid }} {{ name }}</a>{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}{% if e.projects|length > 3 %}<div class="muted small">+{{ e.projects|length - 3 }} more</div>{% endif %}</td>
+    <td>{% if e.last_note %}<div class="muted small">{{ e.last_note_on.strftime('%d %b %Y') if e.last_note_on else "" }}</div>{{ e.last_note | truncate(160) }}{% else %}—{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="empty">No contacts found. Add one in Telegram with /newsite, e.g. “Met contractor Mike, Florissant Construction, Migaa 07…”.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
