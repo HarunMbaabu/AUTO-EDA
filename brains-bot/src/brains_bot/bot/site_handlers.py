@@ -22,8 +22,8 @@ from brains_bot.bot.handlers import (
 )
 from brains_bot.bot.project_handlers import DB_ERROR, _guard_db, _with_session
 from brains_bot.importers.normalize import mask_phone
+from brains_bot.services import contacts, sites
 from brains_bot.services import project_service as svc
-from brains_bot.services import sites
 from brains_bot.services.analysis import AnalysisError
 
 log = logging.getLogger(__name__)
@@ -38,12 +38,30 @@ ASK = (
 )
 ROLE_LABELS = {"contact_person": "contact", "owner": "owner", "contractor": "contractor",
                "architect": "architect"}  # fmt: skip
+CONTACT_KINDS = {"new_contact", "contact_note"}
+AUDIT = {"new_site": "site_created", "follow_up": "site_followup",
+         "new_contact": "contact_created", "contact_note": "contact_note"}  # fmt: skip
+SUMMARY = {"new_site": "new project(s)", "follow_up": "follow-up note(s)",
+           "new_contact": "new contact(s)", "contact_note": "contact note(s)"}  # fmt: skip
+ITEM = {"new_site": "new", "follow_up": "note added to", "new_contact": "new contact",
+        "contact_note": "note added to contact"}  # fmt: skip
 
 
 def _site_lines(n: int | None, draft: sites.SiteDraft) -> list[str]:
     numbers = ", ".join(mask_phone(x) for x in draft.phone.numbers) or "no number"
     role = draft.role_description or ROLE_LABELS[draft.contact_role]
     prefix = f"{n}. " if n is not None else ""
+    if draft.kind == "contact":
+        if draft.existing_contact_id is not None:
+            head = f"{prefix}UPDATE CONTACT → {draft.existing_contact_name}"
+            return [head, f"   adds this as a new note · {numbers}"]
+        details = " · ".join(
+            x for x in (contacts.label(draft.trade), draft.company, draft.area) if x
+        )
+        return [
+            f"{prefix}CONTACT: {draft.contact_name or draft.company or 'no name'} · {details}",
+            f"   {numbers} · no site; saved to the contacts directory",
+        ]
     if draft.existing_project_id is not None:
         head = f"{prefix}FOLLOW-UP → #{draft.existing_project_id} {draft.existing_name}"
         return [head, f"   adds this as a new note · {numbers}"]
@@ -59,22 +77,28 @@ def _site_lines(n: int | None, draft: sites.SiteDraft) -> list[str]:
 
 def _preview(drafts: list[sites.SiteDraft]) -> str:
     many = len(drafts) > 1
-    lines = [f"{len(drafts)} sites: please check" if many else "New site: please check", ""]
+    kinds = {d.kind for d in drafts}
+    noun = {"site": "site", "contact": "contact"}.get(kinds.pop(), "") if len(kinds) == 1 else ""
+    if many:
+        head = f"{len(drafts)} {noun + 's' if noun else 'entries'}: please check"
+    else:
+        head = f"New {noun}: please check"
+    lines = [head, ""]
     for i, draft in enumerate(drafts, start=1):
         lines += _site_lines(i if many else None, draft)
     dates = {d.visit_date for d in drafts}
     if dates == {None}:
-        when = f"Visit date: {date.today():%d %b %Y} (today; no date found in the message)."
+        when = f"Date: {date.today():%d %b %Y} (today; no date found in the message)."
     elif len(dates) == 1:
-        when = f"Visit date: {next(iter(dates)):%d %b %Y} (from the message)."
+        when = f"Date: {next(iter(dates)):%d %b %Y} (from the message)."
     else:
-        when = "Visit dates: as shown per site."
+        when = "Dates: as shown per site."
     lines += [
         "",
         when,
-        "Each site's own text is saved as its note. "
-        "Follow-ups are matched by phone number. If something is wrong, tap Cancel and send "
-        "/newsite again with the message corrected.",
+        "Each entry's own text is saved as its note. "
+        "Follow-ups and known contacts are matched by phone number. "
+        "If something is wrong, tap Cancel and send /newsite again with the message corrected.",
     ]
     return truncate("\n".join(lines), MAX_MESSAGE)
 
@@ -146,14 +170,13 @@ async def site_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     actor = _user_id(update)
 
-    def work(session: Session) -> list[tuple[int, str, bool]]:
+    def work(session: Session) -> list[sites.Saved]:
         saved = []
         for draft in drafts:
-            follow_up = draft.existing_project_id is not None
-            project = sites.save(session, draft, date.today())
-            action_name = "site_followup" if follow_up else "site_created"
-            svc.record_audit(session, actor, action_name, target=f"project:{project.id}")
-            saved.append((project.id, project.name, follow_up))
+            result = sites.save(session, draft, date.today(), actor)
+            target = "contact" if result.kind in CONTACT_KINDS else "project"
+            svc.record_audit(session, actor, AUDIT[result.kind], target=f"{target}:{result.id}")
+            saved.append(result)
         return saved
 
     try:
@@ -164,11 +187,18 @@ async def site_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.answer(DB_ERROR[:190], show_alert=True)
         return
     await query.answer("Saved.")
-    new = [s for s in saved if not s[2]]
-    lines = [f"Saved: {len(new)} new project(s), {len(saved) - len(new)} follow-up note(s)."]
-    for project_id, name, follow_up in saved:
-        kind = "note added to" if follow_up else "new"
-        lines.append(f"- {kind} #{project_id} {name}")
-    first = saved[0][0]
-    lines.append(f"Next: /project {first} · /analyze {first} audio · /draft {first} audio · /top")
+    counts = {kind: sum(s.kind == kind for s in saved) for kind in AUDIT}
+    parts = [f"{counts[kind]} {word}" for kind, word in SUMMARY.items() if counts[kind]]
+    lines = ["Saved: " + ", ".join(parts) + "."]
+    for s in saved:
+        ref = s.name if s.kind in CONTACT_KINDS else f"#{s.id} {s.name}"
+        lines.append(f"- {ITEM[s.kind]} {ref}")
+    projects = [s.id for s in saved if s.kind not in CONTACT_KINDS]
+    if projects:
+        first = projects[0]
+        lines.append(
+            f"Next: /project {first} · /analyze {first} audio · /draft {first} audio · /top"
+        )
+    else:
+        lines.append("See them with /contacts (e.g. /contacts contractor Migaa).")
     await query.edit_message_text(truncate("\n".join(lines), MAX_MESSAGE))

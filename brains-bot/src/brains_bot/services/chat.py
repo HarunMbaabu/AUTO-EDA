@@ -24,7 +24,7 @@ from brains_bot.database.models import CatalogProduct, Contact, Project, Project
 from brains_bot.importers.normalize import redact_contact_details
 from brains_bot.logging_setup import redact
 from brains_bot.services import analysis as an
-from brains_bot.services import catalog, followups, opportunities
+from brains_bot.services import catalog, contacts, followups, opportunities
 from brains_bot.services import project_service as svc
 from brains_bot.services.categories import active_categories, resolve_category
 from brains_bot.services.chat_api import ChatAnalyzer
@@ -74,7 +74,9 @@ Refer to projects as "#<number> <name>" so the user can open one with /project <
 Phone numbers are never available to you; for contact details tell the user to use \
 /project <number>. Mention products and prices only from find_products or analyze_opportunity \
 results, with their exact names and prices, and end with a short line such as "Confirm \
-prices before quoting." Never invent products, brands, specifications or prices.\
+prices before quoting." Never invent products, brands, specifications or prices. \
+For people met for future work (contractors, interior designers, developers, ...) use \
+find_contacts; for their numbers tell the user to send /contacts <trade> <area>.\
 """
 
 _FILTERS = {
@@ -192,6 +194,25 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "find_contacts",
+            "description": "The contacts directory: people by trade (contractors, interior "
+            "designers, developers, architects, ...) with company, area, their sites and the "
+            "latest dated note. Use for 'which contractors do we know in Migaa'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "trade": {"type": "string", "enum": list(contacts.TRADES)},
+                    "text": {
+                        "type": "string",
+                        "description": "Words in name, company, area or their sites' areas",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "list_categories",
             "description": "The product categories that can be analysed, with their keys.",
             "parameters": {"type": "object", "properties": {}},
@@ -246,6 +267,7 @@ class ProjectTools:
             "list_categories": self.list_categories,
             "find_products": self.find_products,
             "rank_opportunities": self.rank_opportunities,
+            "find_contacts": self.find_contacts,
         }
         if name not in handlers:
             return {"error": f"unknown tool {name}"}
@@ -291,6 +313,26 @@ class ProjectTools:
             "site_visit_date": _iso(p.site_visit_date),
             "stage": row.stage.label,
             "stage_recorded_on": _iso(row.stage.recorded_on),
+        }
+
+    def find_contacts(self, trade: str | None = None, text: str | None = None) -> dict[str, Any]:
+        entries, total = contacts.directory(self.session, contacts.trade_key(trade), text)
+        for e in entries:
+            self.projects_seen.update(pid for pid, _ in e.projects)
+        return {
+            "total": total,
+            "contacts": [
+                {
+                    "name": no_contact_details(e.contact.name),
+                    "trade": contacts.label(e.contact.trade),
+                    "company": no_contact_details(e.contact.company),
+                    "area": no_contact_details(e.contact.area),
+                    "projects": [no_contact_details(f"#{pid} {name}") for pid, name in e.projects],
+                    "latest_note_date": _iso(e.last_note_on),
+                    "latest_note": no_contact_details(e.last_note or "")[:NOTE_CHARS] or None,
+                }
+                for e in entries
+            ],
         }
 
     def find_projects(self, **filters: Any) -> dict[str, Any]:

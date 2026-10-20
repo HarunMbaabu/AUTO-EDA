@@ -36,7 +36,7 @@ from brains_bot.database.models import (
 )
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
 from brains_bot.importers.normalize import mask_phone
-from brains_bot.services import followups, metrics, opportunities
+from brains_bot.services import contacts, followups, metrics, opportunities
 from brains_bot.services import project_service as svc
 from brains_bot.services.stages import detect_stage
 
@@ -46,6 +46,7 @@ log = logging.getLogger(__name__)
 
 HERE = Path(__file__).parent
 PAGE_SIZE = 25
+CONTACTS_LIMIT = 200
 QUOTE_STATUSES = ("open", "won", "lost")
 
 
@@ -253,6 +254,31 @@ def create_app(
             request,
             "projects.html",
             {"user": me, "rows": rows, "q": q, "page": page, "pages": pages, "total": total},
+        )
+
+    @app.get("/contacts", response_class=HTMLResponse)
+    def contacts_page(
+        request: Request,
+        trade: str = "",
+        q: str = "",
+        me=Depends(user),
+        session: Session = Depends(db),
+    ):
+        key = trade if trade in contacts.TRADES else None
+        entries, total = contacts.directory(session, key, q.strip(), limit=CONTACTS_LIMIT)
+        return render(
+            request,
+            "contacts.html",
+            {
+                "user": me,
+                "entries": entries,
+                "total": total,
+                "trade": key or "",
+                "q": q,
+                "trades": contacts.TRADES,
+                "counts": contacts.trade_counts(session),
+                "label": contacts.label,
+            },
         )
 
     @app.get("/projects/{project_id}", response_class=HTMLResponse)

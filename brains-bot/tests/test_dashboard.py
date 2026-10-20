@@ -135,3 +135,22 @@ def test_quote_package_must_match_category(client, factory, tmp_path):
     mismatch = {"category": "smart_home", "amount": "1000", "product_sku": "A-WALL", "csrf": csrf}
     response = client.post(f"/projects/{ids['db:1']}/quotes", data=mismatch)
     assert response.status_code == 400 and "different category" in response.text
+
+
+def test_contacts_page_filters_by_trade(client, factory):
+    from brains_bot.importers.normalize import normalize_phone
+    from brains_bot.services import contacts
+
+    with session_scope(factory) as s:
+        contacts.save_contact(s, "Mike", normalize_phone("0701 029 545"), "contractor",
+                              "Florissant Construction", "Migaa", "Good contact",
+                              date(2026, 2, 15))  # fmt: skip
+        contacts.save_contact(s, "Pesh", normalize_phone("0714222776"), "interior_designer",
+                              "Pesh Interiors", "Golden palm", "Call back",
+                              date(2026, 2, 4))  # fmt: skip
+    _log_in(client)
+    page = client.get("/contacts").text
+    assert "Florissant Construction" in page and "Pesh Interiors" in page
+    assert "+254 7XX XXX 545" in page and "701029545" not in page
+    only = client.get("/contacts", params={"trade": "contractor", "q": "Migaa"}).text
+    assert "Florissant Construction" in only and "Pesh Interiors" not in only

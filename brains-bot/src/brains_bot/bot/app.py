@@ -18,6 +18,7 @@ from telegram.ext import (
 from brains_bot.bot import (
     analysis_handlers,
     chat_handlers,
+    contact_handlers,
     followup_handlers,
     handlers,
     import_handlers,
@@ -106,6 +107,7 @@ def build_application(settings: Settings) -> Application:
         "newchat": chat_handlers.new_chat,
         "draft": outreach_handlers.draft,
         "newsite": site_handlers.newsite,
+        "contacts": contact_handlers.contacts_command,
         "top": followup_handlers.top,
         "followups": followup_handlers.followups_command,
         "reminders": followup_handlers.reminders,

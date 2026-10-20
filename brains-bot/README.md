@@ -26,6 +26,7 @@ dashboard.
 | `/followups`       | Authorized     | This week's summary: who to pitch, sent drafts with no reply, open quotes to chase |
 | `/reminders on\|off` | Authorized   | The weekly summary, sent Mondays at 08:00 Nairobi time (on by default) |
 | `/newsite <message>` | Authorized | Add projects by pasting a WhatsApp site report (one site or a numbered list); follow-ups are matched by phone number; check, then tap Save |
+| `/contacts [trade] [area]` | Authorized | The contacts directory by trade, e.g. `/contacts contractor Migaa`, `/contacts interior designer`; `/contacts` alone shows the counts per trade |
 | Any plain message | Authorized | Chat mode: ask in your own words, e.g. "which projects in Ruiru are at painting stage?" |
 | `/newchat`         | Authorized     | Starts a new conversation (forgets earlier questions) |
 | `/import` + send the `.xlsx` | Authorized | Loads or updates the data from a workbook sent to the bot as a file (caption `force` re-imports the same file) |
@@ -174,9 +175,31 @@ with contact details removed and returns the site name, area, city and the conta
 role. The bot shows what it understood with **✅ Save** / **✖ Cancel**; nothing is stored before
 Save. A saved site becomes a normal project: the person named is its contact person (usable by
 `/draft`), the whole message is its first note (so the stage is read from it), and the visit
-date is today. Sites added this way are not flagged when a newer workbook is uploaded, because
+date is the one written in the message (today if none). Sites added this way are not flagged when a newer workbook is uploaded, because
 they were never in it. Mention the stage in plain words (foundation, walling, roofing,
 plastering, skimming, painting, handed over) so timing and ranking can use it.
+
+### Contacts for future work (contractors, interior designers, developers, ...)
+
+A note about a **person, not a site**, goes through `/newsite` too:
+
+```
+/newsite Feb 15th 2026
+Met below contractor at Migaa
+Mike Florissant Construction Migaa
+0701 029 545
+He is a good contact for future projects
+```
+
+The preview shows `CONTACT: Mike · Contractor · Florissant Construction · Migaa`; Save adds him
+to the contacts directory with a dated note, and no project is created. Sending a note with the
+same number later adds it to his entry (`UPDATE CONTACT → Mike`). People named on sites get a
+trade as well (contractor, architect, caretaker, ...), so they appear in the directory too.
+
+Trades: contractor, developer, interior designer, architect, painter / fundi, site manager,
+engineer, foreman, quantity surveyor, caretaker, owner / client, supplier / dealer, other.
+Find people with `/contacts contractor Migaa`, by asking in chat ("which interior designers do
+we know?"), or on the dashboard's **Contacts** page, filtered by trade and area.
 
 ## WhatsApp drafts (`/draft`)
 
