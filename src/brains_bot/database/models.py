@@ -118,6 +118,9 @@ class Contact(TimestampMixin, Base):
     # of the work they do; see services/partners.py.
     partner: Mapped[bool] = mapped_column(default=False, server_default=sa_false(), index=True)
     services: Mapped[list[Any]] = mapped_column(default=list, server_default="[]")
+    # A partner's links to share: [{"kind": "website" | "whatsapp_catalog" | "whatsapp",
+    # "url": ...}], read from their /partner note or brochure.
+    links: Mapped[list[Any]] = mapped_column(default=list, server_default="[]")
 
 
 class ProjectContact(Base):

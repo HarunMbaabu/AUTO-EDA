@@ -29,8 +29,8 @@ dashboard.
 | `/contacts [trade] [area]` | Authorized | The contacts directory by trade, e.g. `/contacts contractor Migaa`, `/contacts interior designer`; `/contacts` alone shows the counts per trade |
 | `/repeats` | Authorized | Projects that look like the same site entered twice (same number, or same contact name in the same area), with the `/merge` command for each |
 | `/merge <repeat> <keep>` | Authorized | Moves a repeat project's notes, people and numbers, drafts and quotes into the project kept, after a confirm button |
-| `/partner <message>` | Authorized | Add people or companies you give jobs to (one or a numbered list), with the work they do and approximate rates; check, then tap Save |
-| `/partners [category or group] [area]` | Authorized | Your partners with their rates, e.g. `/partners interior design`, `/partners finishes Kiambu` |
+| `/partner <message>` | Authorized | Add people or companies you give jobs to (one or a numbered list), with the work they do, approximate rates and links (website, WhatsApp catalogue); check, then tap Save |
+| `/partners [category or group] [area]` | Authorized | Your partners with their rates and links, e.g. `/partners interior design`, `/partners finishes Kiambu` |
 | Send a PDF or photo | Authorized | A brochure: read its products into a catalog spreadsheet to check, keep it in the library, or add the company as a partner |
 | `/brochures [category, group or supplier]` | Authorized | The brochure library; tap one to get the file and forward it to a customer |
 | `/stage <number> [stage] [note]` | Authorized | Confirm or correct a project's construction stage (`/stage 349 skimming`); `/stage 349` alone shows buttons |
@@ -265,7 +265,11 @@ each) and synced when the bot starts.
 ```
 
 The preview shows the work (as categories) and each rate; Save stores them as approximate rates
-with the date. A known phone number adds to that person's entry, so rates build up over time.
+with the date. **Links to share** in the note (a website such as `www.nyumbadesigns.co.ke`, a
+WhatsApp catalogue `https://wa.me/c/254700000000`, or a WhatsApp chat link) are kept with the
+partner and shown in `/partners`, ready to tap or forward to a customer, and as links on the
+dashboard. The bot reads links itself: they never go to the AI, since a WhatsApp link holds a
+phone number. Send `/partner` again with the same phone number and a new link to add it. A known phone number adds to that person's entry, so rates build up over time.
 Find them with `/partners finishes`, `/partners audio Kiambu`, in chat ("who can do curtains,
 and what do they charge?") or on the dashboard's **Partners** page. Partners also appear in the
 contacts directory under their trade.

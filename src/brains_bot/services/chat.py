@@ -77,7 +77,8 @@ results, with their exact names and prices, and end with a short line such as "C
 prices before quoting." Never invent products, brands, specifications or prices. \
 For people met for future work (contractors, interior designers, developers, ...) use \
 find_contacts; for people and companies we give jobs to, and their approximate rates, use \
-find_partners. For numbers tell the user to send /contacts or /partners.\
+find_partners. For numbers and partners' links (website, WhatsApp catalogue) tell the user to \
+send /contacts or /partners.\
 """
 
 _FILTERS = {
@@ -385,6 +386,11 @@ class ProjectTools:
                             "noted_on": _iso(r.noted_on),
                         }
                         for r in p.rates[:6]
+                    ],
+                    # Kinds only: a WhatsApp link holds a phone number.
+                    "links": [
+                        partners.LINK_LABELS.get(x.get("kind"), "Link")
+                        for x in p.contact.links or []
                     ],
                 }
                 for p in found
