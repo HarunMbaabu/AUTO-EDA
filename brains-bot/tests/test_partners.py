@@ -113,3 +113,41 @@ async def test_partner_command_saves_and_lists(factory, context, client_factory=
 def test_rate_wording():
     rate = partners.RateDraft("interior_design", "design per sqm", Decimal(2500), None, "per sqm")
     assert partners.format_rate(rate) == "design: KES 2,500 per sqm"
+
+
+def test_links_are_read_by_the_bot_and_kept_from_the_ai(factory):
+    found = partners.find_links(
+        "Catalogue https://wa.me/c/254790001776, site www.janedecor.co.ke. "
+        "Chat wa.me/254790001776 map https://maps.app.goo.gl/abc WWW.JANEDECOR.CO.KE"
+    )
+    assert found == [
+        {"kind": "whatsapp_catalog", "url": "https://wa.me/c/254790001776"},
+        {"kind": "website", "url": "https://www.janedecor.co.ke"},
+        {"kind": "whatsapp", "url": "https://wa.me/254790001776"},
+    ]
+    with session_scope(factory) as s:
+        sync_categories(s)
+        names = partners.category_names(s)
+    note = "Jane Decor Interiors 0790001776, interior design, https://wa.me/c/254790001776"
+    answer = {"partners": [{"name": "Jane", "company": "Jane Decor Interiors",
+                            "categories": ["interior_design"], "rates": []}]}  # fmt: skip
+    transport = FakeTransport(text(json.dumps(answer)))
+    (draft,) = partners.extract(transport, note, names, date(2026, 10, 20))
+    user = transport.requests[0]["messages"][1]["content"]
+    assert "wa.me" not in user and "254790001776" not in user and "[link]" in user
+    assert draft.links == [{"kind": "whatsapp_catalog", "url": "https://wa.me/c/254790001776"}]
+    assert "   WhatsApp catalogue: https://wa.me/c/254790001776" in partner_handlers.preview(
+        [draft], names
+    )
+
+    with session_scope(factory) as s:
+        contact, _ = partners.save(s, draft, date(2026, 10, 20))
+        draft.links = [*draft.links, {"kind": "website", "url": "https://janedecor.co.ke"}]
+        partners.save(s, draft, date(2026, 10, 21))  # same number: links added once
+        assert [x["kind"] for x in contact.links] == ["whatsapp_catalog", "website"]
+        (p,), _ = partners.directory(s)
+        lines = partner_handlers.partner_lines(p, names)
+        assert "   Website: https://janedecor.co.ke" in lines
+        found = ProjectTools(s, ALLOWED_ID, date(2026, 10, 20)).run("find_partners", {})
+        assert found["partners"][0]["links"] == ["WhatsApp catalogue", "Website"]
+        assert "wa.me" not in json.dumps(found)

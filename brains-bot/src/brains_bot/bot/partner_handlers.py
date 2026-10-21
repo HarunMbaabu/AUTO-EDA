@@ -35,8 +35,9 @@ BROCHURES = "pending_partner_brochures"
 NOT_AVAILABLE = "Adding partners needs MISTRAL_API_KEY or DEEPSEEK_API_KEY to be set."
 ASK = (
     "Paste the details now: one partner, or a numbered list (1. ... 2. ...). Include the work "
-    "they do and any rates, e.g. 'Jane Decor Interiors 0790001776, interior design, about "
-    "1,500 per sqm'. I'll show you what I understood before saving anything."
+    "they do, any rates and links to share (website, WhatsApp catalogue), e.g. 'Jane Decor "
+    "Interiors 0790001776, interior design, about 1,500 per sqm, www.janedecor.co.ke'. "
+    "I'll show you what I understood before saving anything."
 )
 
 
@@ -52,6 +53,7 @@ def _draft_lines(i: int | None, draft: partners.PartnerDraft, names: dict[str, s
     work = ", ".join(names.get(k, k) for k in draft.services)
     lines.append(f"   Work: {work or 'not stated'}")
     lines += [f"   Rate: {partners.format_rate(r)}" for r in draft.rates]
+    lines += partners.link_lines(draft.links)
     return lines
 
 
@@ -196,6 +198,7 @@ def partner_lines(p: partners.Partner, names: dict[str, str]) -> list[str]:
     for rate in p.rates[:4]:
         when = f" ({rate.noted_on:%b %Y})" if rate.noted_on else ""
         lines.append(f"   {partners.format_rate(rate)}{when}")
+    lines += partners.link_lines(c.links or [])
     return lines
 
 

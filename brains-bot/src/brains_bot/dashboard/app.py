@@ -321,6 +321,7 @@ def create_app(
                 "names": partners.category_names(session),
                 "label": contacts.label,
                 "rate": partners.format_rate,
+                "link_labels": partners.LINK_LABELS,
             },
         )
 

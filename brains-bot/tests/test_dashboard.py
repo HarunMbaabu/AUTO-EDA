@@ -170,10 +170,12 @@ def test_partners_page(client, factory):
             trade="interior_designer", services=["interior_design"],
             rates=[partners.RateDraft("interior_design", "design", 1500, None, "per sqm")],
             note=None, phone=normalize_phone("0790001776"),
+            links=[{"kind": "website", "url": "https://janedecor.co.ke"}],
         )  # fmt: skip
         partners.save(s, draft, date(2026, 10, 12))
     _log_in(client)
     page = client.get("/partners", params={"category": "Finishes & Interiors"}).text
     assert "Jane Decor Interiors" in page and "design: KES 1,500 per sqm" in page
     assert "790001776" not in page
+    assert '<a href="https://janedecor.co.ke"' in page and ">Website</a>" in page
     assert "Jane Decor Interiors" not in client.get("/partners", params={"category": "audio"}).text

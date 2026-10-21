@@ -4,17 +4,21 @@ installers, other suppliers), with the work they do and their approximate rates.
 Partners are contacts (see services/contacts.py) marked as partners, so the same phone number
 is the same person whether they were met on a site or added here. They are added by pasting a
 note with /partner; the AI reads names, categories and rates, the bot reads phone numbers and
-dates itself, and nothing is stored before Save.
+dates itself, and nothing is stored before Save. Links to share with customers (a website, a
+WhatsApp catalogue) are read by the bot too: a wa.me link holds a phone number, so links never
+go to the AI.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -28,6 +32,15 @@ from brains_bot.services.analysis import AnalysisError
 log = logging.getLogger(__name__)
 
 LIST_LIMIT = 25
+# A web address: with http(s)://, or starting www. or wa.me/ (as pasted from WhatsApp or a
+# brochure).
+_LINK = re.compile(r"\b(?:https?://|www\.|wa\.me/|wa\.link/)[^\s<>()\"']+", re.I)
+_WHATSAPP_HOSTS = {"wa.me", "api.whatsapp.com", "www.whatsapp.com", "whatsapp.com", "wa.link"}
+LINK_LABELS = {
+    "website": "Website",
+    "whatsapp_catalog": "WhatsApp catalogue",
+    "whatsapp": "WhatsApp",
+}
 EXTRACT_PROMPT = """\
 A sales person in Kenya pasted a note about service providers they can give jobs to (interior \
 designers, painters, installers, suppliers, ...). You get JSON with "context" (any intro text) \
@@ -43,8 +56,8 @@ rate is for in a few words, "amount": the amount as written (e.g. "1,500", "50k"
 "amount_max": the upper amount if a range is given, else null, "unit": e.g. "per sqm", \
 "per day", "per room", "per job", or null}}; [] if no rate is stated
 - "note": anything else useful, in one short sentence, or null
-Contact details were removed and appear as [phone] or [email]. Use only what the text says; \
-never invent rates or categories.\
+Contact details were removed and appear as [phone], [email] or [link]. Use only what the text \
+says; never invent rates or categories.\
 """
 
 
@@ -71,10 +84,42 @@ class PartnerDraft:
     noted_on: date | None = None
     existing_contact_id: int | None = None
     existing_name: str | None = None
+    links: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def label(self) -> str:
         return " · ".join(x for x in (self.name, self.company) if x) or "no name"
+
+
+def find_links(text: str) -> list[dict[str, str]]:
+    """Every website or WhatsApp link in the text (map links left out), each once, as
+    {"kind": "website" | "whatsapp_catalog" | "whatsapp", "url": ...}."""
+    links: dict[str, dict[str, str]] = {}
+    for m in _LINK.finditer(text):
+        url = m.group(0).rstrip(".,;:!?")
+        if sites._MAP_LINK.match(url):
+            continue
+        if not url.lower().startswith("http"):
+            url = "https://" + url
+        parts = urlsplit(url)
+        host, path = (parts.hostname or "").lower(), parts.path.lower()
+        if not host or "." not in host:
+            continue
+        if host in _WHATSAPP_HOSTS:
+            catalog_link = path.startswith("/c/") or "catalog" in path
+            kind = "whatsapp_catalog" if catalog_link else "whatsapp"
+        else:
+            kind = "website"
+        links.setdefault(url.lower(), {"kind": kind, "url": url})
+    return list(links.values())
+
+
+def without_links(text: str) -> str:
+    return _LINK.sub("[link]", text)
+
+
+def link_lines(links: list[dict[str, Any]], indent: str = "   ") -> list[str]:
+    return [f"{indent}{LINK_LABELS.get(x.get('kind'), 'Link')}: {x.get('url')}" for x in links]
 
 
 def _amount(value: Any) -> Decimal | None:
@@ -98,8 +143,8 @@ def extract(
     message = message.strip()[: sites.MAX_MESSAGE_CHARS]
     intro, items = ("", [message]) if single else sites.split_report(message)
     payload = {
-        "context": sites._for_ai(intro) or None,
-        "items": [sites._for_ai(item) for item in items],
+        "context": sites._for_ai(without_links(intro)) or None,
+        "items": [sites._for_ai(without_links(item)) for item in items],
     }
     body = {
         "model": transport.model,
@@ -163,6 +208,7 @@ def extract(
                 note=sites._clean(fields.get("note"), 300),
                 phone=sites.find_phones(item),
                 noted_on=(sites.date_in_text(item, today) if intro else None) or report_date,
+                links=find_links(item),
             )
         )
     return drafts
@@ -186,6 +232,11 @@ def save(
     )  # fmt: skip
     contact.partner = True
     contact.services = list(dict.fromkeys([*(contact.services or []), *draft.services]))
+    known = {x["url"].lower() for x in contact.links or []}
+    contact.links = [
+        *(contact.links or []),
+        *(x for x in draft.links if x["url"].lower() not in known),
+    ]
     for rate in draft.rates:
         session.add(
             PartnerRate(

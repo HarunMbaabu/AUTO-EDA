@@ -2,7 +2,7 @@
 {% block title %}Partners{% endblock %}
 {% block content %}
 <h1>Partners</h1>
-<p class="muted">People and companies we give jobs to, with their approximate rates. Add them in Telegram with /partner.</p>
+<p class="muted">People and companies we give jobs to, with their approximate rates and links to share. Add them in Telegram with /partner.</p>
 <form class="search" method="get" action="/partners">
   <select name="category" aria-label="Category">
     <option value="">All work</option>
@@ -20,7 +20,7 @@
 <p class="muted">{{ total }} partner{{ '' if total == 1 else 's' }}.</p>
 <div class="card flush">
 <table class="rows">
-  <thead><tr><th>Name</th><th>Company / area</th><th>Phone</th><th>Work</th><th>Approx. rates</th></tr></thead>
+  <thead><tr><th>Name</th><th>Company / area</th><th>Phone</th><th>Work</th><th>Approx. rates</th><th>Links</th></tr></thead>
   <tbody>
   {% for p in partners %}
   <tr>
@@ -29,8 +29,9 @@
     <td>{{ p.contact.phone_e164 | phone if p.contact.phone_e164 else "—" }}</td>
     <td>{% for k in p.contact.services or [] %}{{ names.get(k, k) }}{% if not loop.last %}, {% endif %}{% else %}{{ label(p.contact.trade) }}{% endfor %}</td>
     <td>{% for r in p.rates[:5] %}<div>{{ rate(r) }}{% if r.noted_on %} <span class="muted small">({{ r.noted_on.strftime('%b %Y') }})</span>{% endif %}</div>{% else %}—{% endfor %}</td>
+    <td>{% for l in p.contact.links or [] %}<div><a href="{{ l.url }}" target="_blank" rel="noopener noreferrer">{{ link_labels.get(l.kind, "Link") }}</a></div>{% else %}—{% endfor %}</td>
   </tr>
-  {% else %}<tr><td colspan="5" class="empty">No partners found. Add one in Telegram, e.g. /partner Jane Decor 07…, interior design, about 1,500 per sqm.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="6" class="empty">No partners found. Add one in Telegram, e.g. /partner Jane Decor 07…, interior design, about 1,500 per sqm.</td></tr>{% endfor %}
   </tbody>
 </table>
 </div>
