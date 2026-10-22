@@ -66,8 +66,10 @@ Rules the code keeps:
 
 `/newsite` (WhatsApp reports, several sites per message, dates from the text, follow-ups by phone,
 possible repeats by name and area, mistyped numbers flagged) · `/contacts` (directory by trade) ·
-`/partner`, `/partners` (people jobs are routed to, with rates) · brochures (send a PDF or photo:
-read into a catalog sheet, library, or partner; `/brochures`) · catalogs from several suppliers ·
+`/partner`, `/partners` (people jobs are routed to, with rates and links: website, WhatsApp
+catalogue) · brochures (send a PDF, photo or WhatsApp catalogue screen recording: read into a
+catalog sheet, library, or partner; `/brochures`) · `/website` (a partner's website into a
+catalog sheet) · catalogs from several suppliers ·
 `/analyze`, `/draft` (follow-ups in the team's style, with brochure buttons) · `/top`,
 `/followups [drafts]`, Monday summary with three ready drafts · `/stage`, `/plan` · `/repeats`,
 `/merge` · chat mode · dashboard: Overview, Plan, Opportunities, Projects, Contacts, Partners.

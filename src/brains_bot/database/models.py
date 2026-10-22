@@ -387,7 +387,7 @@ class Brochure(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     file_id: Mapped[str] = mapped_column(Text)
     file_unique_id: Mapped[str] = mapped_column(String(120), unique=True)
-    kind: Mapped[str] = mapped_column(String(10))  # document | photo
+    kind: Mapped[str] = mapped_column(String(10))  # document | photo | video
     file_name: Mapped[str | None] = mapped_column(Text)
     mime: Mapped[str | None] = mapped_column(String(100))
     size: Mapped[int | None]
