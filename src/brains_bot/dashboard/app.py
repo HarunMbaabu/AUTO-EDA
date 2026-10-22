@@ -21,6 +21,7 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.middleware.sessions import SessionMiddleware
@@ -35,7 +36,7 @@ from brains_bot.database.models import (
     Quote,
 )
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
-from brains_bot.importers.normalize import mask_phone
+from brains_bot.importers.normalize import format_phone
 from brains_bot.services import contacts, followups, metrics, opportunities, partners, plan
 from brains_bot.services import project_service as svc
 from brains_bot.services.stages import STALE_AFTER_DAYS, detect_stage
@@ -75,6 +76,15 @@ def _session_secret(settings: Settings) -> str:
     return hmac.new(key, b"dashboard-session", hashlib.sha256).hexdigest()
 
 
+def phone_link(e164: str | None) -> Markup | str:
+    """The full number, linked to a WhatsApp chat with it."""
+    if not e164:
+        return "—"
+    return Markup('<a href="https://wa.me/{}" target="_blank" rel="noopener">{}</a>').format(
+        e164.lstrip("+"), format_phone(e164)
+    )
+
+
 def money(value: Any) -> str:
     if value is None:
         return "—"
@@ -110,8 +120,8 @@ def create_app(
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.filters["money"] = money
-    templates.env.filters["phone"] = mask_phone
-    templates.env.filters["masked"] = contacts.note_for_display
+    templates.env.filters["phone"] = phone_link
+    templates.env.filters["phone_text"] = contacts.note_for_display
     templates.env.globals["timing_labels"] = metrics.TIMING_LABELS
     templates.env.globals["stage_choices"] = plan.stage_choices()
 

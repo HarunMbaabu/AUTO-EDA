@@ -21,7 +21,7 @@ from brains_bot.bot.handlers import (
 )
 from brains_bot.bot.project_handlers import DB_ERROR, _guard_db, _with_session
 from brains_bot.database.models import Contact, OutreachDraft, Project
-from brains_bot.importers.normalize import mask_phone
+from brains_bot.importers.normalize import format_phone
 from brains_bot.services import brochures, outreach
 from brains_bot.services import project_service as svc
 from brains_bot.services.analysis import AnalysisError
@@ -49,7 +49,7 @@ def _buttons(
             [
                 [
                     InlineKeyboardButton(
-                        f"{label} ({mask_phone(phone)})" if len(phones) > 1 else label,
+                        f"{label} ({format_phone(phone)})" if len(phones) > 1 else label,
                         callback_data=f"draft:send:{draft.id}:{i}",
                     )
                 ]
@@ -85,7 +85,7 @@ def draft_message(
     to forward with the message)."""
     phones = _phones(contact)
     to = contact.name if contact else "no contact person on record"
-    numbers = ", ".join(mask_phone(n) for n in phones) or "no valid WhatsApp number"
+    numbers = ", ".join(format_phone(n) for n in phones) or "no valid WhatsApp number"
     lines = [
         f"Draft for #{project.id} {project.name} · {category.name}",
         f"To: {to} ({numbers})",

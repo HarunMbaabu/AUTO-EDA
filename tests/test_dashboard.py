@@ -87,8 +87,8 @@ def test_pages_quotes_and_metrics(client, factory, tmp_path):
     assert "Kamau proposed villa" in listing and "Sunrise Apartments" not in listing
 
     page = client.get(f"/projects/{pid}").text
-    assert "Kamau proposed villa" in page and "+254 7XX XXX 678" in page
-    assert "712345678" not in page
+    assert "Kamau proposed villa" in page and "+254 712 345 678" in page
+    assert 'href="https://wa.me/254712345678"' in page
     csrf = page.split('name="csrf" value="')[1].split('"')[0]
     assert client.get("/projects/99999").status_code == 404
 
@@ -151,8 +151,8 @@ def test_contacts_page_filters_by_trade(client, factory):
     _log_in(client)
     page = client.get("/contacts").text
     assert "Example Construction" in page and "Jane Decor Interiors" in page
-    assert "+254 7XX XXX 545" in page and "790004545" not in page
-    assert "0790001776" not in page  # numbers inside notes are masked too
+    assert 'href="https://wa.me/254790004545"' in page and "+254 790 004 545" in page
+    assert "Call back +254 790 001 776" in page  # numbers inside notes are written the same way
     assert "Called on 04 Feb 2026" in page and "Noted on 15 Feb 2026" in page
     only = client.get("/contacts", params={"trade": "contractor", "q": "Migaa"}).text
     assert "Example Construction" in only and "Jane Decor Interiors" not in only
@@ -176,6 +176,6 @@ def test_partners_page(client, factory):
     _log_in(client)
     page = client.get("/partners", params={"category": "Finishes & Interiors"}).text
     assert "Jane Decor Interiors" in page and "design: KES 1,500 per sqm" in page
-    assert "790001776" not in page
+    assert 'href="https://wa.me/254790001776"' in page and "+254 790 001 776" in page
     assert '<a href="https://janedecor.co.ke"' in page and ">Website</a>" in page
     assert "Jane Decor Interiors" not in client.get("/partners", params={"category": "audio"}).text

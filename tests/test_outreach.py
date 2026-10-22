@@ -85,7 +85,7 @@ async def test_draft_command_and_buttons(factory, tmp_path, context):
     await outreach_handlers.draft(update, context)
     shown, kwargs = status.edit_text.await_args.args[0], status.edit_text.await_args.kwargs
     assert "Draft for #" in shown and "Hello Mr. Contact" in shown
-    assert "+254 7XX XXX 678" in shown and "consent is unknown" in shown
+    assert "+254 712 345 678" in shown and "consent is unknown" in shown
     button = kwargs["reply_markup"].inline_keyboard[0][0]
     assert button.text == "📤 Send via WhatsApp"
 
@@ -117,8 +117,8 @@ async def test_draft_offers_each_of_several_numbers(factory, tmp_path, context):
     await outreach_handlers.draft(update, context)
     rows = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard
     assert [r[0].text for r in rows] == [
-        "📤 Send via WhatsApp (+254 7XX XXX 222)",
-        "📤 Send via WhatsApp (+254 7XX XXX 555)",
+        "📤 Send via WhatsApp (+254 722 111 222)",
+        "📤 Send via WhatsApp (+254 733 444 555)",
     ]
 
 

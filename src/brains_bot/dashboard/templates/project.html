@@ -17,7 +17,7 @@
     <h3>People</h3>
     {% if d.contacts %}<table><tbody>{% for c in d.contacts %}<tr><td class="muted">{{ c.role.replace('_', ' ') }}</td><td>{{ c.name }}</td><td>{% if c.phone_e164 %}{{ c.phone_e164 | phone }}{% elif c.phone_status == 'multiple' %}{{ c.phone_count }} numbers{% else %}<span class="muted">{{ c.phone_status }}</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
     {% else %}<p class="empty">No people on record.</p>{% endif %}
-    <p class="muted small">Numbers are masked here; WhatsApp links come from /draft in Telegram. Marketing consent: unknown.</p>
+    <p class="muted small">Tap a number to open a WhatsApp chat; /draft in Telegram writes the message. Marketing consent: unknown.</p>
   </div>
   <div class="card">
     <h3>Site notes</h3>

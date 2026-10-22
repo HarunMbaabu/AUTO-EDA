@@ -64,7 +64,7 @@ async def test_a_new_number_with_the_same_name_and_area_is_offered_as_a_follow_u
 
     preview, saved = await _send(context, AGAIN, "save")
     assert f"POSSIBLE REPEAT → #{betty_id} Wanza project" in preview
-    assert "different number · +254 7XX XXX 098" in preview
+    assert "different number · +254 790 007 098" in preview
     assert saved.startswith("Saved: 1 follow-up note(s).")
     assert _count(factory, Project) == 1
     with session_scope(factory) as s:

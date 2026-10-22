@@ -126,7 +126,7 @@ async def test_newsite_contact_then_contacts_command(factory, context):
     reply = reply_of(update)
     assert "Contractors matching 'Migaa' (1)" in reply
     assert "Musa · Contractor · Example Construction · Migaa" in reply
-    assert "+254 7XX XXX 545" in reply and "Met on 15 Feb 2026: " in reply
+    assert "+254 790 004 545" in reply and "Met on 15 Feb 2026: " in reply
 
     update = make_update(ALLOWED_ID)
     context.args = []
@@ -154,7 +154,7 @@ def test_workbook_people_get_a_trade_from_their_column(factory, tmp_path):
 
 def test_notes_shown_with_numbers_masked():
     shown = contacts.note_for_display("Call Musa 0790 004 545 tomorrow")
-    assert shown == "Call Musa +254 7XX XXX 545 tomorrow"
+    assert shown == "Call Musa +254 790 004 545 tomorrow"
 
 
 @pytest.mark.parametrize(

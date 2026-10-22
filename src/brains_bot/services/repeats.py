@@ -114,7 +114,7 @@ def find_repeats(session: Session) -> list[Group]:
             groups.append(Group([(i, names[i]) for i in sorted(ids)], reason))
 
     for number, ids in by_phone.items():
-        add(ids, f"same number {n.mask_phone(number)}")
+        add(ids, f"same number {n.format_phone(number)}")
     for (first, place), ids in by_person.items():
         add(ids, f"same name '{first.title()}' in {place.title()}")
     return groups

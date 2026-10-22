@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes
 from brains_bot.bot.formatting import MAX_MESSAGE, truncate
 from brains_bot.bot.handlers import _user_id, restricted
 from brains_bot.bot.project_handlers import DB_ERROR, _guard_db, _with_session
-from brains_bot.importers.normalize import mask_phone
+from brains_bot.importers.normalize import format_phone
 from brains_bot.services import contacts
 from brains_bot.services import project_service as svc
 
@@ -39,7 +39,7 @@ def parse_args(args: list[str]) -> tuple[str | None, str]:
 def entry_lines(entry: contacts.Entry) -> list[str]:
     c = entry.contact
     details = " · ".join(x for x in (contacts.label(c.trade), c.company, c.area) if x)
-    phone = mask_phone(c.phone_e164) if c.phone_e164 else "no number"
+    phone = format_phone(c.phone_e164) if c.phone_e164 else "no number"
     lines = [f"• {c.name} · {details}", f"   {phone}"]
     if entry.projects:
         sites = ", ".join(f"#{pid} {name}" for pid, name in entry.projects[:3])

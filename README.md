@@ -43,8 +43,8 @@ dashboard.
 An uploaded workbook is saved only to a temporary folder for the import and deleted right after;
 the import is the same as `brains-bot-import` (max 20 MB, Telegram's limit for bots).
 
-Contact phone numbers are shown masked (`+254 7XX XXX 678`) together with the marketing consent
-status, which the import always sets to **unknown**. Estimated paint start dates are labelled as
+Contact phone numbers are shown in full (`+254 712 345 678`; on the dashboard each one opens a
+WhatsApp chat) together with the marketing consent status, which the import always sets to **unknown**. Estimated paint start dates are labelled as
 historical estimates, not current site status. Every project view and search is recorded in
 `audit_events` (who and what, never the search text or any phone number).
 

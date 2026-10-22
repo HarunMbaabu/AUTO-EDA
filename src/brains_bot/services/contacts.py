@@ -275,15 +275,15 @@ def _add_site_notes(session: Session, entries: list[Entry]) -> None:
 
 
 def note_for_display(text: str | None) -> str | None:
-    """A note with any phone number in it masked like everywhere else (+254 7XX XXX 545)."""
+    """A note with any phone number in it written like everywhere else (+254 790 004 545)."""
     if not text:
         return text
 
-    def mask(match: re.Match[str]) -> str:
+    def tidy(match: re.Match[str]) -> str:
         e164 = n.normalize_phone(match[0]).e164
-        return n.mask_phone(e164) if e164 else "[phone]"
+        return n.format_phone(e164) if e164 else match[0]
 
-    return n.PHONE_IN_TEXT.sub(mask, text)
+    return n.PHONE_IN_TEXT.sub(tidy, text)
 
 
 def trade_counts(session: Session) -> list[tuple[str, int]]:
