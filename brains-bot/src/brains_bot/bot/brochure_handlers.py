@@ -1,5 +1,6 @@
-"""Brochures sent to the bot (PDFs and photos): read them into the catalog, keep them in the
-library, or add them to a partner; /brochures finds them again to forward to customers."""
+"""Brochures sent to the bot (PDFs, photos, and screen recordings of a WhatsApp catalogue):
+read them into the catalog, keep them in the library, or add them to a partner; /brochures finds
+them again to forward to customers."""
 
 from __future__ import annotations
 
@@ -44,6 +45,11 @@ SENT_PER_TAP = 3
 
 def _file_of(update: Update) -> dict[str, Any] | None:
     message = update.effective_message
+    if message.video:  # a screen recording of a WhatsApp catalogue
+        video = message.video
+        return {"file_id": video.file_id, "file_unique_id": video.file_unique_id,
+                "kind": "video", "file_name": video.file_name, "mime": "video/mp4",
+                "size": video.file_size}  # fmt: skip
     if message.photo:
         photo = message.photo[-1]  # the largest size
         return {"file_id": photo.file_id, "file_unique_id": photo.file_unique_id,
@@ -56,11 +62,11 @@ def _file_of(update: Update) -> dict[str, Any] | None:
     name = document.file_name or ""
     if name.lower().endswith(".pdf"):
         mime = "application/pdf"
-    if mime != "application/pdf" and not mime.startswith("image/"):
+    if mime != "application/pdf" and not mime.startswith(("image/", "video/")):
         return None
     return {"file_id": document.file_id, "file_unique_id": document.file_unique_id,
-            "kind": "document", "file_name": name or None, "mime": mime,
-            "size": document.file_size}  # fmt: skip
+            "kind": "video" if mime.startswith("video/") else "document",
+            "file_name": name or None, "mime": mime, "size": document.file_size}  # fmt: skip
 
 
 def is_brochure(update: Update) -> bool:
@@ -78,6 +84,12 @@ async def file_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if found["size"] and found["size"] > MAX_BYTES:
         await update.effective_message.reply_text(
             "That file is larger than 20 MB, which Telegram won't let me download."
+            + (
+                " Send the recording as a video (not as a file) so Telegram makes it smaller, "
+                "or record a shorter part of the catalogue."
+                if found["kind"] == "video"
+                else ""
+            )
         )
         return
     found["caption"] = (update.effective_message.caption or "").strip()[:200]
@@ -97,7 +109,12 @@ async def file_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "nothing goes live until you send it back.\n"
         "- Brochure only: I keep it to forward to customers (/brochures).\n"
         "- Partner: I add the company as a partner with the work they do and any rates.\n"
-        "Tip: a caption with the supplier's name (e.g. 'Sauti Sound') helps.",
+        "Tip: a caption with the supplier's name (e.g. 'Sauti Sound') helps."
+        + (
+            "\nA screen recording takes a minute or two to read: I look at it frame by frame."
+            if found["kind"] == "video"
+            else ""
+        ),
         reply_markup=buttons,
     )
 
@@ -106,6 +123,8 @@ async def _read(context: ContextTypes.DEFAULT_TYPE, found: dict[str, Any]) -> br
     drafter = context.bot_data.get("drafter")
     telegram_file = await context.bot.get_file(found["file_id"])
     data = bytes(await telegram_file.download_as_bytearray())
+    if found["kind"] == "video":
+        return await asyncio.to_thread(brochures.read_video, drafter.transport, data)
     return await asyncio.to_thread(brochures.read_document, drafter.transport, data, found["mime"])
 
 
@@ -142,6 +161,8 @@ async def file_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await query.answer()
     await query.edit_message_text("Reading the brochure… this can take a minute.")
     actor, hint = _user_id(update), found["caption"] or None
+    if found["kind"] == "video":
+        hint = f"{hint}. {brochures.VIDEO_HINT}" if hint else brochures.VIDEO_HINT
     try:
         reading = await _read(context, found)
         if not reading.text.strip():
@@ -188,11 +209,14 @@ async def file_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not info.products:
         await query.edit_message_text(summary + "\n\nI found no products in it to add.")
         return
-    await _send_sheet(update, context, info, supplier, found, summary)
+    what = {"video": "catalogue recording", "photo": "photo"}.get(found["kind"], "brochure")
+    source = f"{what} {found['file_name'] or ''}".strip()
+    await send_sheet(update, context, query.edit_message_text, info, supplier, source, summary)
 
 
-async def _send_sheet(update, context, info, supplier, found, summary) -> None:
-    source = found["file_name"] or "photo"
+async def send_sheet(update, context, edit, info, supplier, source, summary) -> None:
+    """The products as a catalog spreadsheet to check and send back; edit() updates the status
+    message."""
     priced = sum(1 for p in info.products if p.price)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -203,7 +227,7 @@ async def _send_sheet(update, context, info, supplier, found, summary) -> None:
             brochures.catalog_sheet(session, info, supplier, source, path)
 
         await _with_session(context, build)
-        await update.callback_query.edit_message_text(
+        await edit(
             f"{summary}\n\nRead {len(info.products)} products ({priced} with a price). "
             "The spreadsheet is below."
         )
@@ -212,7 +236,7 @@ async def _send_sheet(update, context, info, supplier, found, summary) -> None:
                 handle,
                 filename=name,
                 caption=truncate(
-                    f"{supplier}: {len(info.products)} products from the brochure, plus any "
+                    f"{supplier}: {len(info.products)} products from the {source}, plus any "
                     f"{supplier} products already in the catalog. Check each price, unit and "
                     "install stage (the AI can misread numbers in pictures), fix or delete "
                     "rows, then send this file back to me to load it. Only "
@@ -227,6 +251,8 @@ async def _as_partner(update, context, found, reading, token) -> None:
     drafter = context.bot_data["drafter"]
     names = await _with_session(context, partners.category_names)
     text = f"{found['caption']}\n{reading.text}" if found["caption"] else reading.text
+    if found["kind"] == "video":
+        text = f"{brochures.VIDEO_HINT}\n{text}"
     drafts = await asyncio.to_thread(
         partners.extract, drafter.transport, text, names, date.today(), True
     )
@@ -272,8 +298,9 @@ async def brochures_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
     if not found:
         await update.effective_message.reply_text(
-            "No brochures found. Send me a supplier's PDF or a photo of their brochure to add "
-            "one. Search with /brochures <category, group or supplier>, e.g. /brochures audio."
+            "No brochures found. Send me a supplier's PDF, a photo of their brochure or a screen "
+            "recording of their WhatsApp catalogue to add one. Search with /brochures "
+            "<category, group or supplier>, e.g. /brochures audio."
         )
         return
     more = (
@@ -325,6 +352,8 @@ async def send_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     for kind, file_id, caption in files:
         if kind == "photo":
             await update.effective_chat.send_photo(file_id, caption=caption)
+        elif kind == "video":
+            await update.effective_chat.send_video(file_id, caption=caption)
         else:
             await update.effective_chat.send_document(file_id, caption=caption)
 

@@ -230,6 +230,12 @@ async def partners_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             lines += partner_lines(p, names)
         if total > len(found):
             lines += ["", f"Showing {len(found)}. Add a category or area to narrow it down."]
+        if any(p.contact.links for p in found):
+            lines += [
+                "",
+                "Prices from a partner's website: /website <name>. From a WhatsApp catalogue: "
+                "screen-record it while scrolling and send me the video.",
+            ]
         return "\n".join(lines)
 
     try:

@@ -1,8 +1,9 @@
-"""Supplier and partner brochures (PDFs and photos): read them into the catalog, and keep a
-library of them to forward to customers.
+"""Supplier and partner brochures (PDFs, photos, and screen recordings of a WhatsApp
+catalogue): read them into the catalog, and keep a library of them to forward to customers.
 
 Reading: a PDF with a text layer is read locally; scanned or pictorial pages and photos go to
-Mistral's document reader (OCR). The AI then lists the products it sees. Nothing goes live
+Mistral's document reader (OCR). A screen recording is cut into frames, one each time the
+screen has moved on, and read like photos. The AI then lists the products it sees. Nothing goes live
 from a brochure directly: the bot returns a catalog spreadsheet for a person to check and send
 back, so misread prices never reach drafts.
 
@@ -41,6 +42,16 @@ TRANSCRIBE_PROMPT = (
     "Transcribe all the text in this brochure page: product names, descriptions, prices and "
     "units exactly as written. Plain text only."
 )
+# Screen recordings: look at a frame every FRAME_EVERY seconds, keep it if the screen changed
+# by FRAME_CHANGE (mean grey level, 0-255) since the last kept frame, at most MAX_FRAMES.
+FRAME_EVERY = 0.75
+FRAME_CHANGE = 4.0
+MAX_FRAMES = 24
+FRAME_HEIGHT = 1600  # px: enough to read prices, small enough to send
+VIDEO_HINT = (
+    "These are frames of a screen recording scrolling through a WhatsApp catalogue: the same "
+    "product can appear in several frames; list each product once."
+)
 MAX_TEXT_CHARS = 24_000
 MAX_PRODUCTS = 80
 LIBRARY_LIMIT = 10
@@ -65,7 +76,9 @@ never invent products or prices. A product with no price shown gets null.\
 class Reading:
     text: str
     pages: int
-    method: str  # "text" (read locally) | "ocr" (Mistral's document reader) | "vision"
+    # "text" (read locally) | "ocr" (Mistral's document reader) | "vision" (chat model) |
+    # "shopify" | "woocommerce" | "web" (a website, see services/websites.py)
+    method: str
 
 
 @dataclass
@@ -130,6 +143,70 @@ def _pictures(reader: Any) -> list[tuple[bytes, str]]:
             mime = "image/png" if image.name.lower().endswith(".png") else "image/jpeg"
             found.append((data, mime))
     return found[:MAX_PAGES]
+
+
+def video_frames(data: bytes) -> list[bytes]:
+    """JPEG frames of a screen recording: one each time the screen has moved on (a pause shows
+    the same products, so it is skipped), at most MAX_FRAMES spread over the video."""
+    import av
+    from PIL import ImageChops, ImageStat
+
+    try:
+        container = av.open(io.BytesIO(data))
+    except Exception as exc:
+        raise AnalysisError("that video could not be opened") from exc
+    kept: list[bytes] = []
+    last, next_at = None, 0.0
+    with container:
+        if not container.streams.video:
+            raise AnalysisError("that file has no video in it")
+        stream = container.streams.video[0]
+        stream.thread_type = "AUTO"
+        try:
+            for frame in container.decode(stream):
+                if frame.time is None or frame.time < next_at:
+                    continue
+                next_at = frame.time + FRAME_EVERY
+                image = frame.to_image()
+                small = image.convert("L").resize((48, 96))
+                if last is not None:
+                    change = ImageStat.Stat(ImageChops.difference(small, last)).mean[0]
+                    if change < FRAME_CHANGE:
+                        continue
+                last = small
+                if image.height > FRAME_HEIGHT:
+                    width = round(image.width * FRAME_HEIGHT / image.height)
+                    image = image.resize((width, FRAME_HEIGHT))
+                out = io.BytesIO()
+                image.convert("RGB").save(out, "JPEG", quality=80)
+                kept.append(out.getvalue())
+        except av.error.FFmpegError as exc:
+            if not kept:
+                raise AnalysisError("that video could not be read") from exc
+    if len(kept) > MAX_FRAMES:  # spread evenly, first and last kept
+        step = (len(kept) - 1) / (MAX_FRAMES - 1)
+        kept = [kept[round(i * step)] for i in range(MAX_FRAMES)]
+    return kept
+
+
+def read_video(transport: Any, data: bytes) -> Reading:
+    """A screen recording of a catalogue, read frame by frame like photos."""
+    _need_mistral(transport)
+    frames = video_frames(data)
+    if not frames:
+        raise AnalysisError("no frames could be read from that video")
+    texts, ocr = [], True
+    for frame in frames:
+        if ocr:
+            url = f"data:image/jpeg;base64,{base64.b64encode(frame).decode()}"
+            try:
+                texts.append("\n".join(_ocr(transport, {"type": "image_url", "image_url": url})))
+                continue
+            except AnalysisError:
+                ocr = False  # not on this account: the chat model reads the rest
+        texts.append(_look(transport, frame, "image/jpeg"))
+    log.info("video read", extra={"event": "video_read", "command": str(len(frames))})
+    return Reading("\n\n".join(texts), len(frames), "ocr" if ocr else "vision")
 
 
 def _need_mistral(transport: Any) -> None:
@@ -213,15 +290,17 @@ def extract_products(
         raise AnalysisError("the AI's answer could not be read; please try again") from exc
     if not isinstance(answer, dict):
         answer = {}
-    products = []
+    products, seen = [], set()
     for item in answer.get("products") or []:
         if not isinstance(item, dict) or item.get("category") not in categories:
             continue
         name = _clean(item.get("name"), 120)
-        if name:
+        price = _clean(item.get("price"), 40)
+        if name and (name_key(name), price) not in seen:  # overlapping frames or pages
+            seen.add((name_key(name), price))
             products.append(
                 ProductDraft(item["category"], name, _clean(item.get("brand"), 80),
-                             _clean(item.get("description")) or "", _clean(item.get("price"), 40),
+                             _clean(item.get("description")) or "", price,
                              _clean(item.get("price_unit"), 40))
             )  # fmt: skip
     found = [k for k in answer.get("categories") or [] if k in categories]
@@ -292,7 +371,7 @@ def catalog_sheet(
             product.category, f"{prefix}{number:03d}", product.name, product.brand, supplier,
             product.description, _price_cell(product.price), unit or None,
             _install_stage(categories.get(product.category)), "no", None, None,
-            f"From brochure {source}: check price and install stage",
+            f"From {source}: check price and install stage",
         ])  # fmt: skip
     widths = (14, 12, 34, 12, 18, 40, 12, 16, 12, 10, 10, 12, 40)
     for column, width in zip("ABCDEFGHIJKLM", widths, strict=True):
@@ -354,6 +433,8 @@ def library(
 
 def label(brochure: Brochure) -> str:
     who = f" · {brochure.supplier}" if brochure.supplier else ""
+    if brochure.kind == "video":  # pages holds the frames read
+        return f"{brochure.title}{who} (catalogue video)"
     pages = f", {brochure.pages} pages" if brochure.pages and brochure.pages > 1 else ""
     kind = (
         "photo"

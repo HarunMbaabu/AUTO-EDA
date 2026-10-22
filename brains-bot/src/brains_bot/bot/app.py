@@ -29,6 +29,7 @@ from brains_bot.bot import (
     repeat_handlers,
     site_handlers,
     stage_handlers,
+    website_handlers,
 )
 from brains_bot.config import Settings
 from brains_bot.database.session import make_engine, make_session_factory, session_scope
@@ -117,6 +118,7 @@ def build_application(settings: Settings) -> Application:
         "partner": partner_handlers.partner_command,
         "partners": partner_handlers.partners_command,
         "brochures": brochure_handlers.brochures_command,
+        "website": website_handlers.website_command,
         "stage": stage_handlers.stage_command,
         "plan": stage_handlers.plan_command,
         "top": followup_handlers.top,
@@ -165,10 +167,18 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(
         MessageHandler(PRIVATE_CHAT & filters.TEXT & ~filters.COMMAND, chat_handlers.chat_message)
     )
-    # PDFs and photos are brochures; other files (Excel) are workbook or catalog imports.
+    # PDFs, photos and videos (catalogue screen recordings) are brochures; other files (Excel)
+    # are workbook or catalog imports.
     application.add_handler(
         MessageHandler(
-            PRIVATE_CHAT & (filters.PHOTO | filters.Document.PDF | filters.Document.IMAGE),
+            PRIVATE_CHAT
+            & (
+                filters.PHOTO
+                | filters.VIDEO
+                | filters.Document.PDF
+                | filters.Document.IMAGE
+                | filters.Document.VIDEO
+            ),
             brochure_handlers.file_received,
         )
     )

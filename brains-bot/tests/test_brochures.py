@@ -121,6 +121,7 @@ def test_products_become_a_sheet_to_check_and_load(factory, tmp_path):
 def _file_update(caption=""):
     update = make_update(ALLOWED_ID)
     update.effective_message.photo = []
+    update.effective_message.video = None
     update.effective_message.caption = caption
     update.effective_message.document = SimpleNamespace(
         file_id="FILE1", file_unique_id="U1", file_name="sauti.pdf",
@@ -223,3 +224,83 @@ def test_other_files_are_not_brochures():
     update.effective_message.document.mime_type = "application/zip"
     update.effective_message.document.file_name = "x.zip"
     assert not brochure_handlers.is_brochure(update)
+
+
+def screen_recording(colours, seconds_each=1.5, fps=10):
+    """A small MP4: each colour held still for a while, like pausing on a catalogue screen."""
+    import io
+
+    import av
+    from PIL import Image
+
+    out = io.BytesIO()
+    with av.open(out, "w", format="mp4") as container:
+        stream = container.add_stream("libx264", rate=fps)
+        stream.width, stream.height, stream.pix_fmt = 180, 320, "yuv420p"
+        for colour in colours:
+            image = Image.new("RGB", (180, 320), colour)
+            for _ in range(int(seconds_each * fps)):
+                container.mux(stream.encode(av.VideoFrame.from_image(image)))
+        container.mux(stream.encode())
+    return out.getvalue()
+
+
+def test_a_screen_recording_is_read_frame_by_frame_once_per_screen():
+    video = screen_recording(["white", "black", "white"])
+    frames = brochures.video_frames(video)
+    assert len(frames) == 3  # one per screen, not one per second
+    assert all(f.startswith(b"\xff\xd8") for f in frames)  # JPEG
+
+    transport = MistralTransport(*(text(f"Screen {i} KES 1,000") for i in range(3)))
+    reading = brochures.read_video(transport, video)
+    assert reading.method == "vision" and reading.pages == 3 and "Screen 2" in reading.text
+    ocr_tries = [r for r in transport.requests if r.get("model") == "mistral-ocr-latest"]
+    assert len(ocr_tries) == 1  # not tried again for every frame
+
+    try:
+        brochures.video_frames(b"not a video")
+    except AnalysisError as exc:
+        assert "could not be opened" in str(exc)
+    else:
+        raise AssertionError("a broken video is reported")
+
+
+async def test_a_catalogue_video_becomes_a_sheet(factory, context, monkeypatch):
+    with session_scope(factory) as s:
+        sync_categories(s)
+    _context(context, factory, text(json.dumps(PRODUCTS)))
+    monkeypatch.setattr(
+        brochures,
+        "read_video",
+        lambda transport, data: brochures.Reading("\n".join(LINES), 5, "vision"),
+    )
+    update = _file_update("Sauti Sound")
+    update.effective_message.document = None
+    update.effective_message.video = SimpleNamespace(
+        file_id="VID1", file_unique_id="UV1", file_name=None, file_size=4_000_000
+    )
+    await brochure_handlers.file_received(update, context)
+    assert "frame by frame" in update.effective_message.reply_text.await_args.args[0]
+    tap, query = _tap(_buttons(update)["catalog"])
+    await brochure_handlers.file_callback(tap, context)
+    prompt = context.bot_data["drafter"].transport.requests[0]["messages"][1]["content"]
+    assert "WhatsApp catalogue" in prompt  # the AI is told frames overlap
+    sheet = tap.effective_chat.send_document.await_args
+    assert "products from the catalogue recording" in sheet.kwargs["caption"]
+    with session_scope(factory) as s:
+        (saved,) = s.scalars(select(Brochure)).all()
+        assert saved.kind == "video" and brochures.label(saved).endswith("(catalogue video)")
+
+    tap, _ = _tap(f"brochure:one:{saved.id}")
+    tap.effective_chat.send_video = AsyncMock()
+    await brochure_handlers.send_callback(tap, context)
+    assert tap.effective_chat.send_video.await_args.args[0] == "VID1"
+
+
+def test_repeated_products_are_listed_once():
+    answer = dict(PRODUCTS, products=PRODUCTS["products"] * 2)
+    info = brochures.extract_products(
+        FakeTransport(text(json.dumps(answer))), "text", {"outdoor_audio": "Outdoor Audio",
+                                                          "audio": "Audio"}
+    )  # fmt: skip
+    assert len(info.products) == len({p.name for p in info.products})

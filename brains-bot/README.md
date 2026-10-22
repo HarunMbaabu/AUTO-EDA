@@ -31,7 +31,8 @@ dashboard.
 | `/merge <repeat> <keep>` | Authorized | Moves a repeat project's notes, people and numbers, drafts and quotes into the project kept, after a confirm button |
 | `/partner <message>` | Authorized | Add people or companies you give jobs to (one or a numbered list), with the work they do, approximate rates and links (website, WhatsApp catalogue); check, then tap Save |
 | `/partners [category or group] [area]` | Authorized | Your partners with their rates and links, e.g. `/partners interior design`, `/partners finishes Kiambu` |
-| Send a PDF or photo | Authorized | A brochure: read its products into a catalog spreadsheet to check, keep it in the library, or add the company as a partner |
+| Send a PDF, photo or video | Authorized | A brochure (a video is a screen recording of a WhatsApp catalogue): read its products into a catalog spreadsheet to check, keep it in the library, or add the company as a partner |
+| `/website <partner or link>` | Authorized | Read a partner's or supplier's website for products and prices, into a catalog spreadsheet to check |
 | `/brochures [category, group or supplier]` | Authorized | The brochure library; tap one to get the file and forward it to a customer |
 | `/stage <number> [stage] [note]` | Authorized | Confirm or correct a project's construction stage (`/stage 349 skimming`); `/stage 349` alone shows buttons |
 | `/plan [week\|month\|later]` | Authorized | What to do this week (chase replies and quotes, confirm old stages, pitch now), this month (visits for sites coming into a window, follow-ups falling due, estimated paint starts) or in the next 3 months |
@@ -410,6 +411,32 @@ stays on Telegram's servers: the bot keeps its id and sends it again from there.
 Find brochures with `/brochures outdoor audio`, `/brochures finishes` or `/brochures Sauti`, and
 tap one to get the file to forward. A WhatsApp draft for a category that has brochures shows a
 **📎 Brochures** button, so the brochure can go to the customer with the message.
+
+### From a WhatsApp catalogue (screen recording)
+
+WhatsApp catalogues can't be read from their links (WhatsApp shows them only in the app, and its
+terms don't allow reading them automatically). Instead, open the catalogue in WhatsApp, start
+the phone's screen recording, scroll slowly through the products once, and send the video to
+the bot **as a video** (not as a file, so Telegram makes it smaller than the 20 MB limit). The
+usual buttons follow: **📋 Read products into the catalog** returns the spreadsheet to check.
+
+The bot looks at the video every ¾ second and keeps a frame only when the screen has moved on
+(pauses are skipped), at most 24 frames, each read like a photo; the same product seen in two
+frames is listed once. Scroll slowly enough that every product is on screen for a moment.
+Prices behind "read more" are not seen: open those items in the recording if they matter.
+
+### From a website (`/website`)
+
+`/website Jane Decor` reads the website saved for that partner (`/partner` with a link adds
+one); `/website www.example.co.ke` reads any address. Shops built on Shopify or WooCommerce are
+read from their product list; other sites from the home page and up to seven shop-looking pages
+it links to (shop, products, catalogue, prices, ...), including the product data many sites
+embed for search engines. The result is the same catalog spreadsheet to check and send back.
+
+The bot reads only public addresses, follows the site's robots.txt, and fetches a few pages per
+request. Sites that load their products with JavaScript after the page opens show little: send a
+PDF price list or a screen recording instead. A partner with only a WhatsApp catalogue gets the
+screen-recording instructions.
 
 `/analyze` then lists **catalog options that fit the project's recorded stage** (normal
 installs first, then retrofit options, cheapest first) and the AI may mention only those, by

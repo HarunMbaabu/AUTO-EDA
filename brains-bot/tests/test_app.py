@@ -16,6 +16,7 @@ def test_build_application_registers_commands(settings):
         "start", "help", "myid", "health", "projects", "search", "project", "categories", "analyze",
         "analyse", "import", "newchat", "draft", "top", "followups", "reminders", "newsite",
         "contacts", "repeats", "merge", "partner", "partners", "brochures", "stage", "plan",
+        "website",
     }  # fmt: skip
     assert app.bot_data["settings"] is settings
     assert app.bot_data["db"] is None  # no DATABASE_URL in the test settings
