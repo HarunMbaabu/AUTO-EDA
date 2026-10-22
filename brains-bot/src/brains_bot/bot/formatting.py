@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from brains_bot.importers.normalize import mask_phone
+from brains_bot.importers.normalize import format_phone
 from brains_bot.services.catalog import needs_retrofit, price_text
 from brains_bot.services.project_service import ContactView, ProjectDetail, ProjectSummary
 
@@ -48,7 +48,7 @@ def _contact_line(c: ContactView) -> str:
     if c.role != "contact_person":
         return line
     if c.phone_status == "valid":
-        line += f"\n    Phone: {mask_phone(c.phone_e164)}"
+        line += f"\n    Phone: {format_phone(c.phone_e164)}"
     elif c.phone_status == "multiple":
         line += f"\n    Phone: {c.phone_count} numbers on file; which one to use needs confirming"
     elif c.phone_status in ("invalid", "placeholder"):

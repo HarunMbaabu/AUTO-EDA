@@ -21,7 +21,7 @@ from brains_bot.bot.handlers import (
     restricted,
 )
 from brains_bot.bot.project_handlers import DB_ERROR, _guard_db, _with_session
-from brains_bot.importers.normalize import mask_phone
+from brains_bot.importers.normalize import format_phone
 from brains_bot.services import brochures, contacts, partners
 from brains_bot.services import project_service as svc
 from brains_bot.services.analysis import AnalysisError
@@ -48,7 +48,7 @@ def _draft_lines(i: int | None, draft: partners.PartnerDraft, names: dict[str, s
         if draft.existing_contact_id is not None
         else f"{prefix}PARTNER: {draft.label}"
     )
-    numbers = ", ".join(mask_phone(x) for x in draft.phone.numbers) or "no number"
+    numbers = ", ".join(format_phone(x) for x in draft.phone.numbers) or "no number"
     lines = [head + (f" · {draft.area}" if draft.area else ""), f"   {numbers}"]
     work = ", ".join(names.get(k, k) for k in draft.services)
     lines.append(f"   Work: {work or 'not stated'}")
@@ -192,7 +192,7 @@ async def partner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 def partner_lines(p: partners.Partner, names: dict[str, str]) -> list[str]:
     c = p.contact
     who = " · ".join(x for x in (c.name, c.company if c.company != c.name else None, c.area) if x)
-    phone = mask_phone(c.phone_e164) if c.phone_e164 else "no number"
+    phone = format_phone(c.phone_e164) if c.phone_e164 else "no number"
     work = ", ".join(names.get(k, k) for k in c.services or []) or contacts.label(c.trade)
     lines = [f"• {who}", f"   {phone} · {work}"]
     for rate in p.rates[:4]:

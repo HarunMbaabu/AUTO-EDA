@@ -47,9 +47,9 @@ def test_unusable_numbers(raw, status):
     assert result.e164 is None
 
 
-def test_mask_phone():
-    assert n.mask_phone("+254712345678") == "+254 7XX XXX 678"
-    assert n.mask_phone(None) == "not available"
+def test_format_phone():
+    assert n.format_phone("+254712345678") == "+254 712 345 678"
+    assert n.format_phone(None) == "not available"
 
 
 @pytest.mark.parametrize(

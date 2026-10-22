@@ -94,7 +94,7 @@ async def test_partner_command_saves_and_lists(factory, context, client_factory=
     context.args = ["finishes"]
     await partner_handlers.partners_command(update, context)
     listing = reply_of(update)
-    assert "Partners (2)" in listing and "+254 7XX XXX 776" in listing
+    assert "Partners (2)" in listing and "+254 790 001 776" in listing
     assert "interior design: KES 1,500 per sqm (Oct 2026)" in listing
 
     update = make_update(ALLOWED_ID)

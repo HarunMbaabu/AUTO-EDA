@@ -22,7 +22,7 @@ from brains_bot.bot.handlers import (
     restricted,
 )
 from brains_bot.bot.project_handlers import DB_ERROR, _guard_db, _with_session
-from brains_bot.importers.normalize import mask_phone
+from brains_bot.importers.normalize import format_phone
 from brains_bot.services import contacts, sites
 from brains_bot.services import project_service as svc
 from brains_bot.services.analysis import AnalysisError
@@ -49,7 +49,7 @@ ITEM = {"new_site": "new", "follow_up": "note added to", "new_contact": "new con
 
 
 def _numbers(draft: sites.SiteDraft) -> str:
-    shown = [mask_phone(x) for x in draft.phone.numbers]
+    shown = [format_phone(x) for x in draft.phone.numbers]
     shown += [f"⚠ CHECK NUMBER: {p}" for p in sites.number_problems(draft.phone)]
     return ", ".join(shown) or "no number"
 

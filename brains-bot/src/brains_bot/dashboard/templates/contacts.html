@@ -26,7 +26,7 @@
     <td>{{ e.contact.company or "—" }}<div class="muted small">{{ e.contact.area or "" }}</div></td>
     <td>{{ e.contact.phone_e164 | phone if e.contact.phone_e164 else "—" }}</td>
     <td>{% for pid, name in e.projects[:3] %}<a href="/projects/{{ pid }}">#{{ pid }} {{ name }}</a>{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}{% if e.projects|length > 3 %}<div class="muted small">+{{ e.projects|length - 3 }} more</div>{% endif %}</td>
-    <td>{% if e.last_note %}<div class="small"><strong>{{ e.last_contact or "" }}</strong></div>{{ e.last_note | masked | truncate(160) }}{% else %}—{% endif %}</td>
+    <td>{% if e.last_note %}<div class="small"><strong>{{ e.last_contact or "" }}</strong></div>{{ e.last_note | phone_text | truncate(160) }}{% else %}—{% endif %}</td>
   </tr>
   {% else %}<tr><td colspan="6" class="empty">No contacts found. Add one in Telegram with /newsite, e.g. “Met contractor Musa, Example Construction, Migaa 07…”.</td></tr>{% endfor %}
   </tbody>

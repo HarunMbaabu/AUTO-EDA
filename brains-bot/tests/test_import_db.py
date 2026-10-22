@@ -195,7 +195,7 @@ async def test_project_command_masks_phone(factory, workbook_path, context):
     await project_handlers.project(update, context)
     text = reply_of(update)
     assert "Kamau proposed villa" in text
-    assert "+254 7XX XXX 678" in text and "712345678" not in text
+    assert "+254 712 345 678" in text
     assert "not a verified current status" in text
     with session_scope(factory) as s:
         event = s.scalar(select(AuditEvent).where(AuditEvent.action == "project_view"))

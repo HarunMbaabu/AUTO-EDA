@@ -113,11 +113,13 @@ def redact_contact_details(text: str) -> str:
     return _EMAIL_IN_TEXT.sub("[email]", PHONE_IN_TEXT.sub("[phone]", text))
 
 
-def mask_phone(e164: str | None) -> str:
-    """+254712345678 -> +254 7XX XXX 678"""
+def format_phone(e164: str | None) -> str:
+    """+254712345678 -> +254 712 345 678"""
     if not e164 or len(e164) < 7:
         return "not available"
-    return f"{e164[:4]} {e164[4]}XX XXX {e164[-3:]}"
+    if len(e164) != 13:
+        return e164
+    return f"{e164[:4]} {e164[4:7]} {e164[7:10]} {e164[10:]}"
 
 
 # --- Dates --------------------------------------------------------------------------------

@@ -90,7 +90,7 @@ async def test_newsite_preview_then_save(factory, context):
     await site_handlers.newsite(update, context)
     preview = status.edit_text.await_args.args[0]
     assert "NEW: Runda Example Court project · Runda Example Court, Nairobi" in preview
-    assert "Mutua (contractor) · +254 7XX XXX 244 · map" in preview and "0790003244" not in preview
+    assert "Mutua (contractor) · +254 790 003 244 · map" in preview
     save = status.edit_text.await_args.kwargs["reply_markup"].inline_keyboard[0][0]
 
     query = SimpleNamespace(
